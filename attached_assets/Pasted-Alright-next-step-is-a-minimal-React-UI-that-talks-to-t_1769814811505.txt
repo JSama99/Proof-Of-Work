@@ -1,0 +1,1076 @@
+Alright — next step is a minimal React UI that talks to the MVP API you now have.
+
+This is Replit-friendly, dead-simple, and covers the full loop:
+	•	Issue user token
+	•	List artifacts (pagination)
+	•	Create artifact (with finish criteria)
+	•	Edit draft (title/body/structure/finish criteria)
+	•	Add proof unit
+	•	Complete (finish summary)
+	•	View completed snapshot + RTV lock status
+	•	Revise completed artifact into a new draft
+
+⸻
+
+Option 1 (recommended): Single Replit, API + Frontend in one project
+
+You’ll run:
+	•	API on :3000
+	•	Frontend on :5173 (Vite)
+	•	Frontend proxies /api/* and /auth/* to the API so CORS stays painless.
+
+⸻
+
+1) Add frontend dependencies
+
+From project root:
+
+npm i -D vite @vitejs/plugin-react typescript
+npm i react react-dom
+
+
+⸻
+
+2) Add Vite config (proxy to backend)
+
+vite.config.ts (NEW at repo root)
+
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      // proxy frontend -> backend (Express on 3000)
+      "/auth": "http://127.0.0.1:3000",
+      "/api": "http://127.0.0.1:3000",
+    },
+  },
+});
+
+
+⸻
+
+3) Add Vite entry files
+
+index.html (NEW at repo root)
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POW MVP</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/ui/main.tsx"></script>
+  </body>
+</html>
+
+
+⸻
+
+4) Add UI folder
+
+Create:
+
+src/ui/
+  main.tsx
+  app.tsx
+  api.ts
+  types.ts
+  storage.ts
+  components/
+    Login.tsx
+    ArtifactList.tsx
+    ArtifactEditor.tsx
+    ProofUnits.tsx
+    CompleteArtifact.tsx
+    SnapshotView.tsx
+
+
+⸻
+
+src/ui/main.tsx
+
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { App } from "./app";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+⸻
+
+src/ui/storage.ts
+
+const KEY = "pow_user_token";
+const USERID_KEY = "pow_user_id";
+
+export function getToken() {
+  return localStorage.getItem(KEY);
+}
+export function setToken(token: string) {
+  localStorage.setItem(KEY, token);
+}
+export function clearToken() {
+  localStorage.removeItem(KEY);
+}
+
+export function getUserId() {
+  return localStorage.getItem(USERID_KEY);
+}
+export function setUserId(userId: string) {
+  localStorage.setItem(USERID_KEY, userId);
+}
+export function clearUserId() {
+  localStorage.removeItem(USERID_KEY);
+}
+
+
+⸻
+
+src/ui/types.ts
+
+Keep it lightweight and aligned with your backend.
+
+export type ArtifactType =
+  | "note"
+  | "sop"
+  | "checklist"
+  | "playbook"
+  | "template"
+  | "workflow"
+  | "spec"
+  | "principles"
+  | "journal"
+  | "other";
+
+export type ArtifactStatus = "draft" | "complete";
+
+export type ArtifactStructure = {
+  audience: "internal" | "external" | "unknown";
+  includesWhy: boolean;
+  reusable: boolean;
+  hasStepsOrProcess: boolean;
+  coordinatesToolsOrAgents: boolean;
+  expressesValues: boolean;
+  thinkingOnly: boolean;
+};
+
+export type FinishCriteria = {
+  doneDefinition: string;
+  checks: string[];
+  blockers?: string[];
+};
+
+export type ArtifactRecord = {
+  id: string;
+  userId: string;
+  title: string;
+  type: ArtifactType;
+  structure: ArtifactStructure;
+  status: ArtifactStatus;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+  finalSnapshotId?: string;
+  finishCriteria?: FinishCriteria;
+  finishSummary?: string;
+  rtvTags?: string[];
+  parentArtifactId?: string;
+  parentSnapshotId?: string;
+};
+
+export type ArtifactSnapshot = {
+  artifactId: string;
+  snapshotId: string;
+  frozenAt: string;
+  title: string;
+  type: ArtifactType;
+  structure: ArtifactStructure;
+  body: string;
+  finishCriteria?: FinishCriteria;
+  finishSummary?: string;
+};
+
+export type RTVResponse = {
+  eligible: boolean;
+  locked: boolean;
+  reason: string | null;
+  unlock?: any;
+  tags: string[];
+};
+
+export type ArtifactGetResponse =
+  | { artifact: ArtifactRecord; body: string; rtv: RTVResponse }
+  | { artifact: ArtifactRecord; snapshot: ArtifactSnapshot | null; rtv: RTVResponse };
+
+export type ProofUnit = {
+  id: string;
+  userId: string;
+  artifactId: string;
+  mode: "operator" | "steward";
+  proofType: "ship" | "decide" | "document" | "automate" | "review";
+  note?: string;
+  createdAt: string;
+};
+
+
+⸻
+
+src/ui/api.ts
+
+import { getToken } from "./storage";
+import type {
+  ArtifactRecord,
+  ArtifactGetResponse,
+  ArtifactSnapshot,
+  ProofUnit,
+  ArtifactType,
+  FinishCriteria,
+  ArtifactStructure,
+} from "./types";
+
+async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init.headers as any),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(path, { ...init, headers });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) throw new Error(data?.error ? JSON.stringify(data.error) : `HTTP ${res.status}`);
+  return data as T;
+}
+
+// Auth
+export async function issueToken(userId: string) {
+  return http<{ token: string }>("/auth/issue", {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+// Artifacts
+export async function listArtifacts(limit = 20, cursor: string | null = null) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  return http<{ artifacts: ArtifactRecord[]; nextCursor: string | null }>(`/api/artifacts?${qs.toString()}`);
+}
+
+export async function createArtifact(input: {
+  title: string;
+  type: ArtifactType;
+  body: string;
+  structure?: Partial<ArtifactStructure>;
+  finishCriteria?: FinishCriteria;
+}) {
+  return http<{ artifact: ArtifactRecord }>("/api/artifacts", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getArtifact(id: string) {
+  return http<ArtifactGetResponse>(`/api/artifacts/${id}`);
+}
+
+export async function updateArtifact(id: string, input: Partial<{
+  title: string;
+  type: ArtifactType;
+  body: string;
+  structure: Partial<ArtifactStructure>;
+  finishCriteria: FinishCriteria;
+}>) {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listProofUnits(id: string) {
+  return http<{ proofUnits: ProofUnit[] }>(`/api/artifacts/${id}/proof-units`);
+}
+
+export async function addProofUnit(id: string, input: { mode: ProofUnit["mode"]; proofType: ProofUnit["proofType"]; note?: string }) {
+  return http<{ proofUnit: ProofUnit }>(`/api/artifacts/${id}/proof-units`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function completeArtifact(id: string, input: { finishSummary: string; body?: string }) {
+  return http<{ artifact: ArtifactRecord; snapshotId: string; rtv: any }>(`/api/artifacts/${id}/complete`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function reviseArtifact(id: string, input: { title?: string }) {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/revise`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getSnapshot(id: string, snapshotId: string) {
+  return http<{ snapshot: ArtifactSnapshot }>(`/api/artifacts/${id}/snapshot/${snapshotId}`);
+}
+
+
+⸻
+
+src/ui/components/Login.tsx
+
+import React, { useState } from "react";
+import { issueToken } from "../api";
+import { setToken, setUserId } from "../storage";
+
+export function Login(props: { onLogin: () => void }) {
+  const [userId, setUser] = useState("jsama");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await issueToken(userId.trim());
+      setToken(r.token);
+      setUserId(userId.trim());
+      props.onLogin();
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ padding: 16, maxWidth: 520 }}>
+      <h2>Login</h2>
+      <p>Enter a userId (no password in MVP).</p>
+      <input value={userId} onChange={(e) => setUser(e.target.value)} style={{ width: "100%", padding: 8 }} />
+      <button onClick={submit} disabled={busy} style={{ marginTop: 12, padding: 10, width: "100%" }}>
+        {busy ? "Issuing token..." : "Continue"}
+      </button>
+      {err && <pre style={{ whiteSpace: "pre-wrap", color: "crimson" }}>{err}</pre>}
+    </div>
+  );
+}
+
+
+⸻
+
+src/ui/components/ArtifactList.tsx
+
+import React, { useEffect, useState } from "react";
+import { listArtifacts } from "../api";
+import type { ArtifactRecord } from "../types";
+
+export function ArtifactList(props: {
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  refreshSignal: number;
+}) {
+  const [items, setItems] = useState<ArtifactRecord[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load(first = false) {
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await listArtifacts(20, first ? null : nextCursor);
+      setItems((prev) => (first ? r.artifacts : [...prev, ...r.artifacts]));
+      setNextCursor(r.nextCursor);
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    load(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.refreshSignal]);
+
+  return (
+    <div style={{ borderRight: "1px solid #ddd", padding: 12, width: 360, overflowY: "auto" }}>
+      <h3>Artifacts</h3>
+      {err && <pre style={{ whiteSpace: "pre-wrap", color: "crimson" }}>{err}</pre>}
+      <button onClick={() => load(true)} disabled={busy} style={{ padding: 8, width: "100%" }}>
+        Refresh
+      </button>
+
+      <div style={{ marginTop: 12 }}>
+        {items.map((a) => (
+          <div
+            key={a.id}
+            onClick={() => props.onSelect(a.id)}
+            style={{
+              padding: 10,
+              marginBottom: 8,
+              cursor: "pointer",
+              border: "1px solid #ccc",
+              background: props.selectedId === a.id ? "#f3f3f3" : "white",
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>{a.title}</div>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>
+              {a.type} • {a.status} • {new Date(a.createdAt).toLocaleString()}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => load(false)}
+        disabled={busy || !nextCursor}
+        style={{ padding: 8, width: "100%", marginTop: 12 }}
+      >
+        {nextCursor ? "Load more" : "No more"}
+      </button>
+    </div>
+  );
+}
+
+
+⸻
+
+src/ui/components/ArtifactEditor.tsx
+
+Draft editor + create.
+
+import React, { useEffect, useMemo, useState } from "react";
+import { createArtifact, getArtifact, updateArtifact } from "../api";
+import type { ArtifactGetResponse, ArtifactStructure, ArtifactType, FinishCriteria } from "../types";
+
+const DEFAULT_STRUCTURE: ArtifactStructure = {
+  audience: "internal",
+  includesWhy: false,
+  reusable: false,
+  hasStepsOrProcess: false,
+  coordinatesToolsOrAgents: false,
+  expressesValues: false,
+  thinkingOnly: false,
+};
+
+function safeParseChecks(s: string): string[] {
+  return s
+    .split("\n")
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+export function ArtifactEditor(props: {
+  artifactId: string | null;
+  onCreated: (id: string) => void;
+  onDirtyChange?: () => void;
+  refreshList: () => void;
+}) {
+  const [mode, setMode] = useState<"create" | "edit">("create");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const [title, setTitle] = useState("");
+  const [type, setType] = useState<ArtifactType>("note");
+  const [body, setBody] = useState("");
+  const [structure, setStructure] = useState<ArtifactStructure>(DEFAULT_STRUCTURE);
+
+  const [doneDefinition, setDoneDefinition] = useState("");
+  const [checksText, setChecksText] = useState("");
+
+  const finishCriteria: FinishCriteria | undefined = useMemo(() => {
+    const checks = safeParseChecks(checksText);
+    if (!doneDefinition.trim() && checks.length === 0) return undefined;
+    return { doneDefinition: doneDefinition.trim() || "Define done.", checks: checks.length ? checks : ["Add at least one check."] };
+  }, [doneDefinition, checksText]);
+
+  async function load(id: string) {
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await getArtifact(id);
+      const isComplete = (r as any).artifact.status === "complete";
+      if (isComplete) {
+        setMode("edit");
+        // completed: no draft body; show snapshot body if present
+        const snap = (r as any).snapshot;
+        setTitle((r as any).artifact.title);
+        setType((r as any).artifact.type);
+        setBody(snap?.body ?? "");
+        setStructure((r as any).artifact.structure);
+        setDoneDefinition(snap?.finishCriteria?.doneDefinition ?? (r as any).artifact.finishCriteria?.doneDefinition ?? "");
+        setChecksText((snap?.finishCriteria?.checks ?? (r as any).artifact.finishCriteria?.checks ?? []).join("\n"));
+      } else {
+        setMode("edit");
+        const rr = r as ArtifactGetResponse & any;
+        setTitle(rr.artifact.title);
+        setType(rr.artifact.type);
+        setBody(rr.body ?? "");
+        setStructure(rr.artifact.structure);
+        setDoneDefinition(rr.artifact.finishCriteria?.doneDefinition ?? "");
+        setChecksText((rr.artifact.finishCriteria?.checks ?? []).join("\n"));
+      }
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!props.artifactId) {
+      setMode("create");
+      setTitle("");
+      setType("note");
+      setBody("");
+      setStructure(DEFAULT_STRUCTURE);
+      setDoneDefinition("");
+      setChecksText("");
+      setErr(null);
+      return;
+    }
+    load(props.artifactId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.artifactId]);
+
+  async function create() {
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await createArtifact({
+        title,
+        type,
+        body,
+        structure,
+        finishCriteria,
+      });
+      props.onCreated(r.artifact.id);
+      props.refreshList();
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function save() {
+    if (!props.artifactId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      await updateArtifact(props.artifactId, {
+        title,
+        type,
+        body,
+        structure,
+        finishCriteria,
+      });
+      props.refreshList();
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const canEditBody = mode === "create" || true; // backend blocks edits if completed; UI still allows typing but save will fail.
+
+  return (
+    <div style={{ padding: 12 }}>
+      <h3>{mode === "create" ? "Create Artifact" : "Edit Draft"}</h3>
+      {err && <pre style={{ whiteSpace: "pre-wrap", color: "crimson" }}>{err}</pre>}
+
+      <div style={{ display: "grid", gap: 10, maxWidth: 900 }}>
+        <label>
+          <div>Title</div>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ width: "100%", padding: 8 }} />
+        </label>
+
+        <label>
+          <div>Type</div>
+          <select value={type} onChange={(e) => setType(e.target.value as any)} style={{ width: "100%", padding: 8 }}>
+            {["note","sop","checklist","playbook","template","workflow","spec","principles","journal","other"].map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </label>
+
+        <fieldset style={{ border: "1px solid #ccc", padding: 10 }}>
+          <legend>Structure</legend>
+
+          <label>
+            Audience{" "}
+            <select
+              value={structure.audience}
+              onChange={(e) => setStructure({ ...structure, audience: e.target.value as any })}
+            >
+              <option value="internal">internal</option>
+              <option value="external">external</option>
+              <option value="unknown">unknown</option>
+            </select>
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+            {(["includesWhy","reusable","hasStepsOrProcess","coordinatesToolsOrAgents","expressesValues","thinkingOnly"] as const).map((k) => (
+              <label key={k} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={structure[k]}
+                  onChange={(e) => setStructure({ ...structure, [k]: e.target.checked } as any)}
+                />
+                {k}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset style={{ border: "1px solid #ccc", padding: 10 }}>
+          <legend>Finish Criteria (required for most types)</legend>
+
+          <label>
+            <div>Done definition</div>
+            <input
+              value={doneDefinition}
+              onChange={(e) => setDoneDefinition(e.target.value)}
+              placeholder="What must be true for this to be done?"
+              style={{ width: "100%", padding: 8 }}
+            />
+          </label>
+
+          <label>
+            <div>Checks (one per line)</div>
+            <textarea
+              value={checksText}
+              onChange={(e) => setChecksText(e.target.value)}
+              rows={4}
+              style={{ width: "100%", padding: 8 }}
+            />
+          </label>
+        </fieldset>
+
+        <label>
+          <div>Body</div>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={10}
+            style={{ width: "100%", padding: 8 }}
+            disabled={!canEditBody}
+          />
+        </label>
+
+        {mode === "create" ? (
+          <button onClick={create} disabled={busy} style={{ padding: 10 }}>
+            {busy ? "Creating..." : "Create"}
+          </button>
+        ) : (
+          <button onClick={save} disabled={busy} style={{ padding: 10 }}>
+            {busy ? "Saving..." : "Save Draft"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
+⸻
+
+src/ui/components/ProofUnits.tsx
+
+import React, { useEffect, useState } from "react";
+import { addProofUnit, listProofUnits } from "../api";
+import type { ProofUnit } from "../types";
+
+export function ProofUnits(props: { artifactId: string | null }) {
+  const [items, setItems] = useState<ProofUnit[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const [mode, setMode] = useState<ProofUnit["mode"]>("operator");
+  const [proofType, setProofType] = useState<ProofUnit["proofType"]>("document");
+  const [note, setNote] = useState("");
+
+  async function load() {
+    if (!props.artifactId) return;
+    setErr(null);
+    try {
+      const r = await listProofUnits(props.artifactId);
+      setItems(r.proofUnits);
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    }
+  }
+
+  useEffect(() => {
+    setItems([]);
+    if (props.artifactId) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.artifactId]);
+
+  async function submit() {
+    if (!props.artifactId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      await addProofUnit(props.artifactId, { mode, proofType, note: note.trim() || undefined });
+      setNote("");
+      await load();
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!props.artifactId) return <div style={{ padding: 12 }}>Select an artifact.</div>;
+
+  return (
+    <div style={{ padding: 12 }}>
+      <h3>Proof Units</h3>
+      {err && <pre style={{ whiteSpace: "pre-wrap", color: "crimson" }}>{err}</pre>}
+
+      <div style={{ display: "grid", gap: 8, maxWidth: 900 }}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <label>
+            Mode{" "}
+            <select value={mode} onChange={(e) => setMode(e.target.value as any)}>
+              <option value="operator">operator</option>
+              <option value="steward">steward</option>
+            </select>
+          </label>
+
+          <label>
+            Type{" "}
+            <select value={proofType} onChange={(e) => setProofType(e.target.value as any)}>
+              {["ship","decide","document","automate","review"].map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label>
+          Note (optional)
+          <input value={note} onChange={(e) => setNote(e.target.value)} style={{ width: "100%", padding: 8 }} />
+        </label>
+
+        <button onClick={submit} disabled={busy} style={{ padding: 10 }}>
+          {busy ? "Adding..." : "Add Proof Unit"}
+        </button>
+
+        <div style={{ marginTop: 12 }}>
+          {items.length === 0 ? (
+            <div style={{ opacity: 0.8 }}>No proof units yet.</div>
+          ) : (
+            items.map((p) => (
+              <div key={p.id} style={{ border: "1px solid #ccc", padding: 10, marginBottom: 8 }}>
+                <div style={{ fontWeight: 700 }}>
+                  {p.mode} • {p.proofType}
+                </div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>{new Date(p.createdAt).toLocaleString()}</div>
+                {p.note && <div style={{ marginTop: 6 }}>{p.note}</div>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+⸻
+
+src/ui/components/CompleteArtifact.tsx
+
+import React, { useState } from "react";
+import { completeArtifact } from "../api";
+
+export function CompleteArtifact(props: { artifactId: string | null; onCompleted: () => void }) {
+  const [finishSummary, setFinishSummary] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    if (!props.artifactId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      await completeArtifact(props.artifactId, { finishSummary: finishSummary.trim() });
+      setFinishSummary("");
+      props.onCompleted();
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!props.artifactId) return <div style={{ padding: 12 }}>Select an artifact.</div>;
+
+  return (
+    <div style={{ padding: 12 }}>
+      <h3>Complete</h3>
+      <p style={{ opacity: 0.8 }}>
+        Completion freezes a snapshot, deletes draft body, assigns RTV tags, and enforces proof + finish criteria.
+      </p>
+
+      {err && <pre style={{ whiteSpace: "pre-wrap", color: "crimson" }}>{err}</pre>}
+
+      <label style={{ display: "block", maxWidth: 900 }}>
+        Finish summary (required)
+        <textarea
+          value={finishSummary}
+          onChange={(e) => setFinishSummary(e.target.value)}
+          rows={4}
+          style={{ width: "100%", padding: 8 }}
+        />
+      </label>
+
+      <button onClick={submit} disabled={busy || finishSummary.trim().length < 10} style={{ padding: 10, marginTop: 10 }}>
+        {busy ? "Completing..." : "Complete Artifact"}
+      </button>
+    </div>
+  );
+}
+
+
+⸻
+
+src/ui/components/SnapshotView.tsx
+
+import React, { useEffect, useState } from "react";
+import { getArtifact, reviseArtifact } from "../api";
+import type { ArtifactGetResponse } from "../types";
+
+export function SnapshotView(props: { artifactId: string | null; onRevised: (newId: string) => void; refreshList: () => void }) {
+  const [data, setData] = useState<ArtifactGetResponse | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    if (!props.artifactId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await getArtifact(props.artifactId);
+      setData(r);
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    setData(null);
+    if (props.artifactId) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.artifactId]);
+
+  async function revise() {
+    if (!props.artifactId) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const r = await reviseArtifact(props.artifactId, {});
+      props.refreshList();
+      props.onRevised(r.artifact.id);
+    } catch (e: any) {
+      setErr(e.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!props.artifactId) return <div style={{ padding: 12 }}>Select an artifact.</div>;
+  if (busy && !data) return <div style={{ padding: 12 }}>Loading...</div>;
+
+  const artifact = data?.artifact;
+  const isComplete = artifact?.status === "complete";
+  const snap = (data as any)?.snapshot;
+
+  return (
+    <div style={{ padding: 12 }}>
+      <h3>View</h3>
+      {err && <pre style={{ whiteSpace: "pre-wrap", color: "crimson" }}>{err}</pre>}
+      {!artifact ? <div>Nothing loaded.</div> : null}
+
+      {artifact && (
+        <div style={{ border: "1px solid #ccc", padding: 10, maxWidth: 900 }}>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>{artifact.title}</div>
+          <div style={{ fontSize: 12, opacity: 0.8 }}>
+            {artifact.type} • {artifact.status} • created {new Date(artifact.createdAt).toLocaleString()}
+          </div>
+
+          <div style={{ marginTop: 10, padding: 10, border: "1px dashed #bbb" }}>
+            <div style={{ fontWeight: 700 }}>RTV</div>
+            <pre style={{ whiteSpace: "pre-wrap", margin: 0 }}>{JSON.stringify((data as any).rtv, null, 2)}</pre>
+          </div>
+
+          {isComplete && (
+            <>
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontWeight: 700 }}>Frozen Snapshot</div>
+                <div style={{ fontSize: 12, opacity: 0.8 }}>
+                  snapshot {artifact.finalSnapshotId} • frozen {snap?.frozenAt ? new Date(snap.frozenAt).toLocaleString() : "?"}
+                </div>
+                <pre style={{ whiteSpace: "pre-wrap", marginTop: 8, padding: 10, background: "#f7f7f7" }}>
+                  {snap?.body ?? "(missing snapshot body)"}
+                </pre>
+              </div>
+
+              <button onClick={revise} disabled={busy} style={{ padding: 10, marginTop: 10 }}>
+                {busy ? "Revising..." : "Revise → new draft"}
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+⸻
+
+src/ui/app.tsx
+
+This ties everything together.
+
+import React, { useMemo, useState } from "react";
+import { Login } from "./components/Login";
+import { ArtifactList } from "./components/ArtifactList";
+import { ArtifactEditor } from "./components/ArtifactEditor";
+import { ProofUnits } from "./components/ProofUnits";
+import { CompleteArtifact } from "./components/CompleteArtifact";
+import { SnapshotView } from "./components/SnapshotView";
+import { clearToken, getToken, getUserId, clearUserId } from "./storage";
+
+export function App() {
+  const [authed, setAuthed] = useState(!!getToken());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [refreshSignal, setRefreshSignal] = useState(0);
+  const userId = useMemo(() => getUserId(), [authed, refreshSignal]);
+
+  function refreshList() {
+    setRefreshSignal((x) => x + 1);
+  }
+
+  if (!authed) return <Login onLogin={() => setAuthed(true)} />;
+
+  return (
+    <div style={{ display: "flex", height: "100vh", fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+      <ArtifactList selectedId={selectedId} onSelect={setSelectedId} refreshSignal={refreshSignal} />
+
+      <div style={{ flex: 1, overflowY: "auto" }}>
+        <div style={{ padding: 12, borderBottom: "1px solid #ddd", display: "flex", justifyContent: "space-between" }}>
+          <div>
+            <strong>POW MVP</strong>
+            <div style={{ fontSize: 12, opacity: 0.8 }}>user: {userId}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => {
+                setSelectedId(null);
+              }}
+            >
+              New
+            </button>
+            <button
+              onClick={() => {
+                clearToken();
+                clearUserId();
+                setAuthed(false);
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+
+        <ArtifactEditor
+          artifactId={selectedId}
+          onCreated={(id) => setSelectedId(id)}
+          refreshList={refreshList}
+        />
+
+        <div style={{ borderTop: "1px solid #ddd" }}>
+          <ProofUnits artifactId={selectedId} />
+        </div>
+
+        <div style={{ borderTop: "1px solid #ddd" }}>
+          <CompleteArtifact artifactId={selectedId} onCompleted={() => refreshList()} />
+        </div>
+
+        <div style={{ borderTop: "1px solid #ddd" }}>
+          <SnapshotView
+            artifactId={selectedId}
+            refreshList={refreshList}
+            onRevised={(newId) => setSelectedId(newId)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+⸻
+
+5) Update your scripts to run both servers
+
+In package.json, add:
+
+{
+  "scripts": {
+    "dev:api": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "dev:ui": "vite",
+    "dev:all": "npm run dev:api & npm run dev:ui"
+  }
+}
+
+Run:
+
+npm run dev:all
+
+Open the Vite URL Replit provides (usually your webview).
+
+⸻
+
+6) What you can do immediately in the UI
+	1.	Login with userId (ex: jsama)
+	2.	Click New → create artifact with finish criteria + body
+	3.	Add a proof unit
+	4.	Complete with finish summary
+	5.	View snapshot + RTV status
+	6.	Revise → new draft created from snapshot
+
+⸻
+
+Critical note (so you don’t get confused)
+	•	Backend does not allow editing completed artifacts.
+	•	In the UI, if you try to save changes on a completed artifact, the backend will reject it (as designed).
+	•	“Revise” is the correct way to continue.
+
+⸻
+
+If you want, next I can add a small “RTV view” page that only shows mapping labels + structural summaries (no advice) and stays gated behind your unlock rule.

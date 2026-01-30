@@ -1,0 +1,1981 @@
+Below is a single consolidated “starter code + improvements” MVP (Packs A–F baked in) that you can paste into Replit.
+
+What you get in one repo:
+	•	✅ User auth (signed Bearer tokens)
+	•	✅ POW Artifacts (draft → complete → immutable snapshot)
+	•	✅ Proof Units (completion requires proof)
+	•	✅ Finish Criteria (explicit “done” checks)
+	•	✅ RTV tags (structural, non-actionable) + unlock gating
+	•	✅ Locks (double-complete protection)
+	•	✅ Audit log (append-only events)
+	•	✅ Rate limits (write endpoints)
+	•	✅ Pagination (artifact list)
+	•	✅ Admin migrations + backup/restore
+	•	✅ Key indexing + chunked backup + streaming gzip
+	•	✅ Integrity scan + reindex/repair
+	•	✅ Postgres export (JSON + SQL)
+
+No Supabase. Uses Replit DB only.
+
+⸻
+
+0) Replit setup
+
+Install deps
+
+npm init -y
+npm i express cors zod nanoid jose @replit/database
+npm i -D typescript ts-node-dev @types/node @types/express @types/cors
+npx tsc --init
+
+package.json scripts
+
+{
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  }
+}
+
+Replit Secrets (Environment Variables)
+
+Set these:
+	•	POW_AUTH_SECRET = long random string (user token signing)
+	•	POW_ADMIN_SECRET = long random string (used ONLY to issue admin tokens)
+	•	POW_ADMIN_TOKEN_SECRET = long random string (admin token signing)
+
+⸻
+
+1) File tree
+
+src/
+  index.ts
+  db.ts
+
+  tokens.ts
+  auth.ts
+
+  admin_tokens.ts
+  middleware/
+    admin_auth.ts
+    admin_scopes.ts
+
+  types.ts
+  rtv.ts
+  templates.ts
+  finish_criteria.ts
+  locks.ts
+  audit.ts
+  rate_limit.ts
+  user_state.ts
+  proof_units.ts
+
+  versioning.ts
+  migrations/
+    index.ts
+    m000_init.ts
+    m001_user_index.ts
+    m002_snapshots.ts
+
+  backup.ts
+  key_index.ts
+  integrity.ts
+  export_postgres.ts
+
+  routes/
+    auth.ts
+    artifacts.ts
+    admin_auth.ts
+    admin.ts
+    admin_tools.ts
+    admin_stream_backup.ts
+
+
+⸻
+
+2) Code (paste file-by-file)
+
+src/db.ts
+
+import Database from "@replit/database";
+
+export const db = new Database();
+
+export const keys = {
+  artifact: (id: string) => `artifact:${id}`,
+  artifactSnapshot: (artifactId: string, snapshotId: string) =>
+    `artifact_snapshot:${artifactId}:${snapshotId}`,
+  userArtifactsIndex: (userId: string) => `user_artifacts_index:${userId}`,
+  userEvents: (userId: string) => `user_events:${userId}`,
+};
+
+src/types.ts
+
+import type { FinishCriteria } from "./finish_criteria";
+
+export type ArtifactStatus = "draft" | "complete";
+
+export type RTVTag =
+  | "internal_leverage"
+  | "client_facing_assets"
+  | "reusable_knowledge"
+  | "automation_systems"
+  | "cultural_signaling";
+
+export type ArtifactType =
+  | "note"
+  | "sop"
+  | "checklist"
+  | "playbook"
+  | "template"
+  | "workflow"
+  | "spec"
+  | "principles"
+  | "journal"
+  | "other";
+
+export type ArtifactStructure = {
+  audience: "internal" | "external" | "unknown";
+  includesWhy: boolean;
+  reusable: boolean;
+  hasStepsOrProcess: boolean;
+  coordinatesToolsOrAgents: boolean;
+  expressesValues: boolean;
+  thinkingOnly: boolean;
+};
+
+export type ArtifactRecord = {
+  _t?: "artifact";
+  _v?: number;
+
+  id: string;
+  userId: string;
+
+  title: string;
+  type: ArtifactType;
+  structure: ArtifactStructure;
+
+  status: ArtifactStatus;
+
+  createdAt: string;
+  updatedAt: string;
+
+  completedAt?: string;
+  finalSnapshotId?: string;
+
+  // POW discipline
+  finishCriteria?: FinishCriteria;
+  finishSummary?: string; // required at completion
+
+  // RTV
+  rtvTags?: RTVTag[];
+
+  // Revision lineage
+  parentArtifactId?: string;
+  parentSnapshotId?: string;
+};
+
+export type ArtifactSnapshot = {
+  _t?: "artifact_snapshot";
+  _v?: number;
+
+  artifactId: string;
+  snapshotId: string;
+  frozenAt: string;
+
+  title: string;
+  type: ArtifactType;
+  structure: ArtifactStructure;
+
+  body: string;
+
+  finishCriteria?: FinishCriteria;
+  finishSummary?: string;
+};
+
+src/tokens.ts
+
+import crypto from "crypto";
+import { base64url } from "jose";
+
+type TokenPayload = { sub: string; iat: number; exp: number; v: 1 };
+
+function secret(): string {
+  const s = process.env.POW_AUTH_SECRET;
+  if (!s) throw new Error("Missing POW_AUTH_SECRET");
+  return s;
+}
+
+export function signToken(userId: string, ttlSeconds = 60 * 60 * 24 * 7): string {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: TokenPayload = { sub: userId, iat: now, exp: now + ttlSeconds, v: 1 };
+
+  const body = base64url.encode(Buffer.from(JSON.stringify(payload), "utf8"));
+  const sig = crypto.createHmac("sha256", secret()).update(body).digest();
+  const sigB64 = base64url.encode(sig);
+  return `${body}.${sigB64}`;
+}
+
+export function verifyToken(token: string): { ok: true; userId: string } | { ok: false } {
+  try {
+    const [body, sigB64] = token.split(".");
+    if (!body || !sigB64) return { ok: false };
+
+    const expected = crypto.createHmac("sha256", secret()).update(body).digest();
+    const got = base64url.decode(sigB64);
+
+    if (got.length !== expected.length) return { ok: false };
+    if (!crypto.timingSafeEqual(Buffer.from(got), expected)) return { ok: false };
+
+    const payload = JSON.parse(Buffer.from(base64url.decode(body)).toString("utf8")) as TokenPayload;
+    const now = Math.floor(Date.now() / 1000);
+
+    if (payload.v !== 1) return { ok: false };
+    if (typeof payload.sub !== "string") return { ok: false };
+    if (payload.exp <= now) return { ok: false };
+
+    return { ok: true, userId: payload.sub };
+  } catch {
+    return { ok: false };
+  }
+}
+
+src/auth.ts
+
+import { Request, Response, NextFunction } from "express";
+import { verifyToken } from "./tokens";
+
+export function requireUser(req: Request, res: Response, next: NextFunction) {
+  const auth = req.header("authorization") || "";
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  if (!m) return res.status(401).json({ error: "Missing Authorization: Bearer <token>" });
+
+  const verified = verifyToken(m[1]);
+  if (!verified.ok) return res.status(401).json({ error: "Invalid or expired token" });
+
+  (req as any).userId = verified.userId;
+  next();
+}
+
+export function getUserId(req: Request): string {
+  return (req as any).userId as string;
+}
+
+src/admin_tokens.ts
+
+import crypto from "crypto";
+import { base64url } from "jose";
+
+type AdminTokenPayload = {
+  sub: "admin";
+  iat: number;
+  exp: number;
+  v: 1;
+  scope: string[];
+};
+
+function secret(): string {
+  const s = process.env.POW_ADMIN_TOKEN_SECRET;
+  if (!s) throw new Error("Missing POW_ADMIN_TOKEN_SECRET");
+  return s;
+}
+
+export function signAdminToken(scope: string[], ttlSeconds = 60 * 60): string {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: AdminTokenPayload = { sub: "admin", iat: now, exp: now + ttlSeconds, v: 1, scope };
+
+  const body = base64url.encode(Buffer.from(JSON.stringify(payload), "utf8"));
+  const sig = crypto.createHmac("sha256", secret()).update(body).digest();
+  const sigB64 = base64url.encode(sig);
+  return `${body}.${sigB64}`;
+}
+
+export function verifyAdminToken(token: string): { ok: true; scope: string[] } | { ok: false } {
+  try {
+    const [body, sigB64] = token.split(".");
+    if (!body || !sigB64) return { ok: false };
+
+    const expected = crypto.createHmac("sha256", secret()).update(body).digest();
+    const got = base64url.decode(sigB64);
+
+    if (got.length !== expected.length) return { ok: false };
+    if (!crypto.timingSafeEqual(Buffer.from(got), expected)) return { ok: false };
+
+    const payload = JSON.parse(Buffer.from(base64url.decode(body)).toString("utf8")) as AdminTokenPayload;
+    const now = Math.floor(Date.now() / 1000);
+
+    if (payload.v !== 1) return { ok: false };
+    if (payload.sub !== "admin") return { ok: false };
+    if (!Array.isArray(payload.scope)) return { ok: false };
+    if (payload.exp <= now) return { ok: false };
+
+    return { ok: true, scope: payload.scope };
+  } catch {
+    return { ok: false };
+  }
+}
+
+src/middleware/admin_auth.ts
+
+import { Request, Response, NextFunction } from "express";
+import { verifyAdminToken } from "../admin_tokens";
+
+export function requireAdminScope(required: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const auth = req.header("authorization") || "";
+    const m = auth.match(/^Bearer\s+(.+)$/i);
+    if (!m) return res.status(401).json({ error: "Missing Authorization: Bearer <admin_token>" });
+
+    const verified = verifyAdminToken(m[1]);
+    if (!verified.ok) return res.status(401).json({ error: "Invalid or expired admin token" });
+
+    const scope = verified.scope;
+    const ok = scope.includes("*") || required.every((s) => scope.includes(s));
+    if (!ok) return res.status(403).json({ error: "Insufficient admin scope" });
+
+    (req as any).adminScope = scope;
+    next();
+  };
+}
+
+src/middleware/admin_scopes.ts
+
+export const ADMIN_SCOPES = {
+  meta: ["meta"],
+  migrate: ["migrate"],
+  backup: ["backup"],
+  restore: ["restore"],
+  index: ["index"],
+  integrity: ["integrity"],
+  repair: ["repair"],
+  compact: ["compact"],
+  export: ["export"],
+} as const;
+
+src/locks.ts
+
+import { db } from "./db";
+
+type LockRecord = { owner: string; acquiredAt: string; expiresAt: number };
+
+function lockKey(kind: "artifact", id: string) {
+  return `lock:${kind}:${id}`;
+}
+
+export async function acquireLock(kind: "artifact", id: string, owner: string, ttlMs = 10_000) {
+  const key = lockKey(kind, id);
+  const now = Date.now();
+  const existing = (await db.get(key)) as LockRecord | null;
+
+  if (existing && existing.expiresAt > now) return { ok: false as const };
+
+  const record: LockRecord = { owner, acquiredAt: new Date().toISOString(), expiresAt: now + ttlMs };
+  await db.set(key, record);
+
+  const check = (await db.get(key)) as LockRecord | null;
+  if (!check || check.owner !== owner || check.expiresAt <= now) return { ok: false as const };
+
+  return { ok: true as const };
+}
+
+export async function releaseLock(kind: "artifact", id: string, owner: string) {
+  const key = lockKey(kind, id);
+  const existing = (await db.get(key)) as LockRecord | null;
+  if (existing?.owner === owner) await db.delete(key);
+}
+
+src/audit.ts
+
+import { nanoid } from "nanoid";
+import { db, keys } from "./db";
+
+export type AuditEventType =
+  | "artifact_created"
+  | "artifact_updated"
+  | "artifact_completed"
+  | "artifact_revised"
+  | "rtv_viewed";
+
+export type AuditEvent = {
+  _t?: "audit_event";
+  _v?: number;
+
+  id: string;
+  type: AuditEventType;
+  userId: string;
+  artifactId?: string;
+  ts: string;
+  meta?: Record<string, any>;
+};
+
+export async function writeEvent(evt: Omit<AuditEvent, "id" | "ts">) {
+  const id = nanoid();
+  const full: AuditEvent = { _t: "audit_event", _v: 1, id, ts: new Date().toISOString(), ...evt };
+
+  await db.set(`event:${id}`, full);
+
+  const k = keys.userEvents(full.userId);
+  const existing = ((await db.get(k)) as string[] | null) ?? [];
+  existing.push(id);
+  await db.set(k, existing);
+
+  return full;
+}
+
+src/rate_limit.ts
+
+import { db } from "./db";
+
+type Bucket = { resetAt: number; count: number };
+
+export async function rateLimit(userId: string, routeKey: string, cfg: { windowMs: number; max: number }) {
+  const k = `rl:${userId}:${routeKey}`;
+  const now = Date.now();
+  const b = (await db.get(k)) as Bucket | null;
+
+  if (!b || b.resetAt <= now) {
+    await db.set(k, { resetAt: now + cfg.windowMs, count: 1 });
+    return { ok: true as const };
+  }
+
+  if (b.count >= cfg.max) {
+    return { ok: false as const, retryAfterSec: Math.max(1, Math.ceil((b.resetAt - now) / 1000)) };
+  }
+
+  b.count += 1;
+  await db.set(k, b);
+  return { ok: true as const };
+}
+
+src/finish_criteria.ts
+
+import { z } from "zod";
+
+export const finishCriteriaSchema = z.object({
+  doneDefinition: z.string().min(10).max(300),
+  checks: z.array(z.string().min(3).max(120)).min(1).max(20),
+  blockers: z.array(z.string().min(3).max(120)).max(10).optional(),
+});
+
+export type FinishCriteria = z.infer<typeof finishCriteriaSchema>;
+
+export function validateFinishCriteria(fc: unknown) {
+  return finishCriteriaSchema.safeParse(fc);
+}
+
+src/templates.ts
+
+import { ArtifactType, ArtifactStructure } from "./types";
+
+export type ArtifactTemplate = {
+  type: ArtifactType;
+  defaults: ArtifactStructure;
+  completionRequires: Array<keyof ArtifactStructure | "finishCriteria">;
+};
+
+export const TEMPLATES: Record<ArtifactType, ArtifactTemplate> = {
+  sop: {
+    type: "sop",
+    defaults: {
+      audience: "internal",
+      includesWhy: false,
+      reusable: true,
+      hasStepsOrProcess: true,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["hasStepsOrProcess", "reusable", "finishCriteria"],
+  },
+  checklist: {
+    type: "checklist",
+    defaults: {
+      audience: "internal",
+      includesWhy: false,
+      reusable: true,
+      hasStepsOrProcess: true,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["hasStepsOrProcess", "finishCriteria"],
+  },
+  playbook: {
+    type: "playbook",
+    defaults: {
+      audience: "internal",
+      includesWhy: true,
+      reusable: true,
+      hasStepsOrProcess: true,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["includesWhy", "reusable", "finishCriteria"],
+  },
+  template: {
+    type: "template",
+    defaults: {
+      audience: "internal",
+      includesWhy: false,
+      reusable: true,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["reusable", "finishCriteria"],
+  },
+  workflow: {
+    type: "workflow",
+    defaults: {
+      audience: "internal",
+      includesWhy: false,
+      reusable: true,
+      hasStepsOrProcess: true,
+      coordinatesToolsOrAgents: true,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["coordinatesToolsOrAgents", "finishCriteria"],
+  },
+  spec: {
+    type: "spec",
+    defaults: {
+      audience: "internal",
+      includesWhy: true,
+      reusable: true,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["includesWhy", "finishCriteria"],
+  },
+  principles: {
+    type: "principles",
+    defaults: {
+      audience: "unknown",
+      includesWhy: true,
+      reusable: true,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: true,
+      thinkingOnly: false,
+    },
+    completionRequires: ["expressesValues", "finishCriteria"],
+  },
+  note: {
+    type: "note",
+    defaults: {
+      audience: "unknown",
+      includesWhy: false,
+      reusable: false,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["finishCriteria"],
+  },
+  journal: {
+    type: "journal",
+    defaults: {
+      audience: "internal",
+      includesWhy: false,
+      reusable: false,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: true,
+    },
+    completionRequires: [],
+  },
+  other: {
+    type: "other",
+    defaults: {
+      audience: "unknown",
+      includesWhy: false,
+      reusable: false,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: false,
+      thinkingOnly: false,
+    },
+    completionRequires: ["finishCriteria"],
+  },
+};
+
+export function applyTemplateDefaults(type: ArtifactType, structure?: Partial<ArtifactStructure>) {
+  const t = TEMPLATES[type] ?? TEMPLATES.other;
+  return { ...t.defaults, ...(structure ?? {}) };
+}
+
+src/user_state.ts
+
+import { db } from "./db";
+
+export type UserState = {
+  _t?: "user_state";
+  _v?: number;
+
+  userId: string;
+  completedArtifacts: number;
+  revisionsCreated: number;
+  modesUsed: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+const key = (userId: string) => `user_state:${userId}`;
+
+export async function getUserState(userId: string): Promise<UserState> {
+  const existing = (await db.get(key(userId))) as UserState | null;
+  if (existing) return existing;
+
+  const fresh: UserState = {
+    _t: "user_state",
+    _v: 1,
+    userId,
+    completedArtifacts: 0,
+    revisionsCreated: 0,
+    modesUsed: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  await db.set(key(userId), fresh);
+  return fresh;
+}
+
+export async function saveUserState(state: UserState) {
+  state.updatedAt = new Date().toISOString();
+  await db.set(key(state.userId), state);
+}
+
+export async function markModeUsed(userId: string, mode: string) {
+  const state = await getUserState(userId);
+  if (!state.modesUsed.includes(mode)) {
+    state.modesUsed.push(mode);
+    state.modesUsed.sort();
+    await saveUserState(state);
+  }
+}
+
+export async function incCompletedArtifacts(userId: string, by = 1) {
+  const state = await getUserState(userId);
+  state.completedArtifacts += by;
+  await saveUserState(state);
+}
+
+export async function incRevisionsCreated(userId: string, by = 1) {
+  const state = await getUserState(userId);
+  state.revisionsCreated += by;
+  await saveUserState(state);
+}
+
+export function isRTVUnlocked(state: UserState) {
+  const completedOk = state.completedArtifacts >= 5;
+  const modesOk = state.modesUsed.length >= 2;
+  const revisionsOk = state.revisionsCreated >= 1;
+
+  return {
+    unlocked: completedOk && modesOk && revisionsOk,
+    requirements: {
+      completedArtifacts: { have: state.completedArtifacts, need: 5 },
+      distinctModes: { have: state.modesUsed.length, need: 2 },
+      revisionsCreated: { have: state.revisionsCreated, need: 1 },
+    },
+  };
+}
+
+src/proof_units.ts
+
+import { nanoid } from "nanoid";
+import { db } from "./db";
+import { markModeUsed } from "./user_state";
+
+export type Mode = "operator" | "steward";
+export type ProofType = "ship" | "decide" | "document" | "automate" | "review";
+
+export type ProofUnit = {
+  _t?: "proof_unit";
+  _v?: number;
+
+  id: string;
+  userId: string;
+  artifactId: string;
+  mode: Mode;
+  proofType: ProofType;
+  note?: string;
+  createdAt: string;
+};
+
+function proofKey(id: string) {
+  return `proof_unit:${id}`;
+}
+function artifactIndexKey(artifactId: string) {
+  return `artifact_proof_units:${artifactId}`;
+}
+
+export async function createProofUnit(input: Omit<ProofUnit, "id" | "createdAt">) {
+  const id = nanoid();
+  const pu: ProofUnit = {
+    _t: "proof_unit",
+    _v: 1,
+    id,
+    createdAt: new Date().toISOString(),
+    ...input,
+  };
+
+  await db.set(proofKey(id), pu);
+
+  const k = artifactIndexKey(pu.artifactId);
+  const existing = ((await db.get(k)) as string[] | null) ?? [];
+  existing.push(id);
+  await db.set(k, existing);
+
+  await markModeUsed(pu.userId, pu.mode);
+  return pu;
+}
+
+export async function listProofUnitsForArtifact(userId: string, artifactId: string) {
+  const ids = ((await db.get(artifactIndexKey(artifactId))) as string[] | null) ?? [];
+  const units: ProofUnit[] = [];
+  for (const id of ids) {
+    const pu = (await db.get(proofKey(id))) as ProofUnit | null;
+    if (pu && pu.userId === userId && pu.artifactId === artifactId) units.push(pu);
+  }
+  units.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return units;
+}
+
+src/rtv.ts
+
+import { ArtifactRecord, RTVTag } from "./types";
+import { getUserState, isRTVUnlocked } from "./user_state";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+export const RTV_MIN_ARTIFACT_AGE_DAYS = 2;
+
+export function assignRTVTags(artifact: ArtifactRecord): RTVTag[] {
+  const tags = new Set<RTVTag>();
+  const s = artifact.structure;
+
+  if (s.thinkingOnly) return [];
+  if (artifact.type === "journal") return [];
+
+  if (s.reusable && s.hasStepsOrProcess && s.audience === "internal") tags.add("internal_leverage");
+  if (s.audience === "external") tags.add("client_facing_assets");
+  if (s.includesWhy && s.reusable) tags.add("reusable_knowledge");
+  if (s.coordinatesToolsOrAgents || (artifact.type === "workflow" && s.hasStepsOrProcess)) tags.add("automation_systems");
+  if (s.expressesValues || artifact.type === "principles") tags.add("cultural_signaling");
+
+  return Array.from(tags).sort((a, b) => a.localeCompare(b));
+}
+
+export async function getRTVStatus(artifact: ArtifactRecord) {
+  if (artifact.status !== "complete") return { eligible: false as const, locked: false as const, reason: "not_complete" as const };
+  if (!artifact.completedAt || !artifact.finalSnapshotId) return { eligible: false as const, locked: false as const, reason: "missing_snapshot" as const };
+
+  const ageDays = (Date.now() - new Date(artifact.createdAt).getTime()) / DAY_MS;
+  if (ageDays < RTV_MIN_ARTIFACT_AGE_DAYS) return { eligible: false as const, locked: false as const, reason: "too_new" as const };
+  if (artifact.structure.thinkingOnly) return { eligible: false as const, locked: false as const, reason: "thinking_only" as const };
+  if (artifact.type === "journal") return { eligible: false as const, locked: false as const, reason: "journal_excluded" as const };
+
+  const state = await getUserState(artifact.userId);
+  const unlock = isRTVUnlocked(state);
+  if (!unlock.unlocked) return { eligible: false as const, locked: true as const, reason: "rtv_locked" as const, unlock };
+
+  return { eligible: true as const, locked: false as const, reason: null as const, unlock };
+}
+
+src/versioning.ts
+
+import { db } from "./db";
+
+export type DbMeta = {
+  schemaVersion: number;
+  appliedMigrations: string[];
+  lastMigrationAt?: string;
+};
+
+const META_KEY = "db_meta";
+
+export async function getDbMeta(): Promise<DbMeta> {
+  const meta = (await db.get(META_KEY)) as DbMeta | null;
+  if (meta) return meta;
+  const fresh: DbMeta = { schemaVersion: 0, appliedMigrations: [] };
+  await db.set(META_KEY, fresh);
+  return fresh;
+}
+
+export async function saveDbMeta(meta: DbMeta) {
+  await db.set(META_KEY, meta);
+}
+
+src/migrations/index.ts
+
+import { getDbMeta, saveDbMeta } from "../versioning";
+import { m000_init } from "./m000_init";
+import { m001_user_index } from "./m001_user_index";
+import { m002_snapshots } from "./m002_snapshots";
+
+export type MigrationCtx = { dryRun?: boolean; limit?: number };
+
+export type Migration = {
+  id: string;
+  toVersion: number;
+  description: string;
+  run: (ctx: MigrationCtx) => Promise<{ changed: number; notes?: string[] }>;
+};
+
+export const MIGRATIONS: Migration[] = [m000_init, m001_user_index, m002_snapshots].sort(
+  (a, b) => a.toVersion - b.toVersion
+);
+
+export async function runMigrations(ctx: MigrationCtx = {}) {
+  const meta = await getDbMeta();
+  const applied = new Set(meta.appliedMigrations);
+
+  let changedTotal = 0;
+  const appliedNow: string[] = [];
+  const notes: string[] = [];
+
+  for (const m of MIGRATIONS) {
+    if (applied.has(m.id)) continue;
+
+    const result = await m.run(ctx);
+    changedTotal += result.changed;
+    appliedNow.push(m.id);
+    if (result.notes?.length) notes.push(...result.notes);
+
+    if (!ctx.dryRun) {
+      meta.schemaVersion = Math.max(meta.schemaVersion, m.toVersion);
+      meta.appliedMigrations.push(m.id);
+      meta.lastMigrationAt = new Date().toISOString();
+      await saveDbMeta(meta);
+    }
+  }
+
+  return { meta: await getDbMeta(), changedTotal, appliedNow, notes };
+}
+
+src/migrations/m000_init.ts
+
+import { Migration } from "./index";
+import { db } from "../db";
+
+async function tag(prefix: string, type: string, v: number, dryRun?: boolean, limit?: number) {
+  const keys = ((await db.list(prefix)) ?? []).slice(0, limit ?? 1_000_000);
+  let changed = 0;
+  for (const k of keys) {
+    const obj = (await db.get(k)) as any;
+    if (!obj || typeof obj !== "object") continue;
+    if (obj._t && obj._v) continue;
+    changed += 1;
+    if (!dryRun) await db.set(k, { _t: type, _v: v, ...obj });
+  }
+  return changed;
+}
+
+export const m000_init: Migration = {
+  id: "m000_init",
+  toVersion: 1,
+  description: "Add _t/_v markers to existing records.",
+  run: async (ctx) => {
+    const dryRun = !!ctx.dryRun;
+    const changed =
+      (await tag("artifact:", "artifact", 1, dryRun, ctx.limit)) +
+      (await tag("artifact_snapshot:", "artifact_snapshot", 1, dryRun, ctx.limit)) +
+      (await tag("proof_unit:", "proof_unit", 1, dryRun, ctx.limit)) +
+      (await tag("user_state:", "user_state", 1, dryRun, ctx.limit)) +
+      (await tag("event:", "audit_event", 1, dryRun, ctx.limit));
+    return { changed, notes: dryRun ? ["Dry run: no writes performed."] : [] };
+  },
+};
+
+src/migrations/m001_user_index.ts
+
+import { Migration } from "./index";
+import { db, keys } from "../db";
+
+export const m001_user_index: Migration = {
+  id: "m001_user_index",
+  toVersion: 2,
+  description: "Backfill user_artifacts_index from any legacy user_artifacts keys (best-effort).",
+  run: async (ctx) => {
+    const dryRun = !!ctx.dryRun;
+    const legacy = await db.list("user_artifacts:");
+    let changed = 0;
+
+    for (const uk of (legacy ?? []).slice(0, ctx.limit ?? 1_000_000)) {
+      const userId = uk.replace("user_artifacts:", "");
+      const legacyIds = ((await db.get(uk)) as string[] | null) ?? [];
+      const existing = (await db.get(keys.userArtifactsIndex(userId))) as string[] | null;
+      if (existing && existing.length) continue;
+      changed += 1;
+      if (!dryRun) await db.set(keys.userArtifactsIndex(userId), legacyIds);
+    }
+
+    return { changed, notes: dryRun ? ["Dry run: no writes performed."] : [] };
+  },
+};
+
+src/migrations/m002_snapshots.ts
+
+import { Migration } from "./index";
+import { db, keys } from "../db";
+import { nanoid } from "nanoid";
+
+export const m002_snapshots: Migration = {
+  id: "m002_snapshots",
+  toVersion: 3,
+  description: "Ensure completed artifacts have snapshot (best-effort).",
+  run: async (ctx) => {
+    const dryRun = !!ctx.dryRun;
+    const artifactKeys = ((await db.list("artifact:")) ?? []).slice(0, ctx.limit ?? 1_000_000);
+    let changed = 0;
+    const notes: string[] = [];
+
+    for (const ak of artifactKeys) {
+      const a = (await db.get(ak)) as any;
+      if (!a || a.status !== "complete") continue;
+
+      if (a.finalSnapshotId) {
+        const snap = await db.get(keys.artifactSnapshot(a.id, a.finalSnapshotId));
+        if (snap) continue;
+      }
+
+      // We cannot reconstruct if body is gone (normal after Pack A+)
+      const body = a.body ?? null;
+      if (!body) {
+        notes.push(`Cannot reconstruct snapshot for artifact ${a.id} (no body stored).`);
+        continue;
+      }
+
+      const snapshotId = nanoid();
+      const snap = {
+        _t: "artifact_snapshot",
+        _v: 1,
+        artifactId: a.id,
+        snapshotId,
+        frozenAt: a.completedAt ?? new Date().toISOString(),
+        title: a.title,
+        type: a.type,
+        structure: a.structure,
+        body,
+        finishCriteria: a.finishCriteria,
+        finishSummary: a.finishSummary,
+      };
+
+      changed += 1;
+      if (!dryRun) {
+        await db.set(keys.artifactSnapshot(a.id, snapshotId), snap);
+        a.finalSnapshotId = snapshotId;
+        await db.set(ak, a);
+      }
+    }
+
+    return { changed, notes: dryRun ? ["Dry run: no writes performed.", ...notes] : notes };
+  },
+};
+
+src/backup.ts
+
+import { db } from "./db";
+
+export async function exportJsonl(prefixes: string[], limitPerPrefix = 50_000) {
+  const lines: string[] = [];
+  for (const prefix of prefixes) {
+    const ks = ((await db.list(prefix)) ?? []).slice(0, limitPerPrefix);
+    for (const k of ks) {
+      lines.push(JSON.stringify({ key: k, value: await db.get(k) }));
+    }
+  }
+  return lines.join("\n");
+}
+
+export async function exportJson(prefixes: string[], limitPerPrefix = 50_000) {
+  const out: Record<string, any> = {};
+  for (const prefix of prefixes) {
+    const ks = ((await db.list(prefix)) ?? []).slice(0, limitPerPrefix);
+    for (const k of ks) out[k] = await db.get(k);
+  }
+  return out;
+}
+
+export async function importJson(entries: Record<string, any>, dryRun = true) {
+  let written = 0;
+  for (const [k, v] of Object.entries(entries)) {
+    written += 1;
+    if (!dryRun) await db.set(k, v);
+  }
+  return { written };
+}
+
+export async function importJsonl(jsonl: string, dryRun = true) {
+  const lines = jsonl.split("\n").filter(Boolean);
+  let written = 0;
+  for (const line of lines) {
+    const row = JSON.parse(line);
+    if (!row.key) continue;
+    written += 1;
+    if (!dryRun) await db.set(row.key, row.value);
+  }
+  return { written };
+}
+
+src/key_index.ts
+
+import { db } from "./db";
+
+export type KeyIndex = { prefix: string; keys: string[]; builtAt: string };
+export const keyIndexKey = (prefix: string) => `key_index:${prefix}`;
+
+export async function buildKeyIndex(prefix: string, dryRun = true) {
+  const keys = (await db.list(prefix)) ?? [];
+  keys.sort();
+  const index: KeyIndex = { prefix, keys, builtAt: new Date().toISOString() };
+  if (!dryRun) await db.set(keyIndexKey(prefix), index);
+  return { count: keys.length, index };
+}
+
+export async function getKeyIndex(prefix: string) {
+  return (await db.get(keyIndexKey(prefix))) as KeyIndex | null;
+}
+
+export async function chunkFromIndex(prefix: string, cursor: string | null, limit: number) {
+  const idx = await getKeyIndex(prefix);
+  if (!idx) return { error: "missing_index" as const, message: `Missing key index for ${prefix}` };
+
+  let start = 0;
+  if (cursor) {
+    const i = idx.keys.indexOf(cursor);
+    start = i >= 0 ? i + 1 : 0;
+  }
+
+  const slice = idx.keys.slice(start, start + limit);
+  const nextCursor = slice.length === limit ? slice[slice.length - 1] : null;
+
+  return { error: null as const, prefix, builtAt: idx.builtAt, keys: slice, nextCursor, total: idx.keys.length };
+}
+
+src/integrity.ts
+
+import { db, keys } from "./db";
+
+export async function runIntegrityScan(limitPerPrefix = 50_000) {
+  const ts = new Date().toISOString();
+  const issues: Array<{ type: string; detail: any }> = [];
+  const counts: Record<string, number> = {};
+
+  const artifactKeys = ((await db.list("artifact:")) ?? []).slice(0, limitPerPrefix);
+  counts.artifacts = artifactKeys.length;
+
+  for (const ak of artifactKeys) {
+    const a = (await db.get(ak)) as any;
+    if (!a || a.status !== "complete") continue;
+    if (!a.finalSnapshotId) {
+      issues.push({ type: "artifact_missing_finalSnapshotId", detail: { id: a.id } });
+      continue;
+    }
+    const snap = await db.get(keys.artifactSnapshot(a.id, a.finalSnapshotId));
+    if (!snap) issues.push({ type: "artifact_snapshot_missing", detail: { id: a.id, finalSnapshotId: a.finalSnapshotId } });
+  }
+
+  const userIndexKeys = ((await db.list("user_artifacts_index:")) ?? []).slice(0, limitPerPrefix);
+  counts.userIndexes = userIndexKeys.length;
+  for (const uk of userIndexKeys) {
+    const userId = uk.replace("user_artifacts_index:", "");
+    const ids = ((await db.get(uk)) as string[] | null) ?? [];
+    for (const id of ids) {
+      const a = await db.get(keys.artifact(id));
+      if (!a) issues.push({ type: "user_index_orphan_artifact", detail: { userId, artifactId: id } });
+    }
+  }
+
+  const apuKeys = ((await db.list("artifact_proof_units:")) ?? []).slice(0, limitPerPrefix);
+  counts.artifactProofUnitIndexes = apuKeys.length;
+  for (const pk of apuKeys) {
+    const artifactId = pk.replace("artifact_proof_units:", "");
+    const ids = ((await db.get(pk)) as string[] | null) ?? [];
+    for (const proofId of ids) {
+      const pu = await db.get(`proof_unit:${proofId}`);
+      if (!pu) issues.push({ type: "artifact_proof_index_orphan", detail: { artifactId, proofId } });
+    }
+  }
+
+  const ueKeys = ((await db.list("user_events:")) ?? []).slice(0, limitPerPrefix);
+  counts.userEventIndexes = ueKeys.length;
+  for (const ek of ueKeys) {
+    const userId = ek.replace("user_events:", "");
+    const ids = ((await db.get(ek)) as string[] | null) ?? [];
+    for (const eventId of ids) {
+      const evt = await db.get(`event:${eventId}`);
+      if (!evt) issues.push({ type: "user_events_orphan_event", detail: { userId, eventId } });
+    }
+  }
+
+  counts.issues = issues.length;
+  return { ts, issues, counts };
+}
+
+src/export_postgres.ts
+
+import { db } from "./db";
+
+async function list(prefix: string, limit = 50_000) {
+  return ((await db.list(prefix)) ?? []).slice(0, limit);
+}
+
+export async function exportAsJson(limitPerPrefix = 50_000) {
+  const artifacts = [];
+  for (const k of await list("artifact:", limitPerPrefix)) artifacts.push({ key: k, value: await db.get(k) });
+
+  const snapshots = [];
+  for (const k of await list("artifact_snapshot:", limitPerPrefix)) snapshots.push({ key: k, value: await db.get(k) });
+
+  const proofUnits = [];
+  for (const k of await list("proof_unit:", limitPerPrefix)) proofUnits.push({ key: k, value: await db.get(k) });
+
+  const userStates = [];
+  for (const k of await list("user_state:", limitPerPrefix)) userStates.push({ key: k, value: await db.get(k) });
+
+  const events = [];
+  for (const k of await list("event:", limitPerPrefix)) events.push({ key: k, value: await db.get(k) });
+
+  return { artifacts, snapshots, proofUnits, userStates, events };
+}
+
+function esc(val: any) {
+  return String(val).replace(/\\/g, "\\\\").replace(/'/g, "''");
+}
+
+export async function exportAsSql(limitPerPrefix = 50_000) {
+  const json = await exportAsJson(limitPerPrefix);
+  const stmts: string[] = [];
+
+  stmts.push("CREATE TABLE IF NOT EXISTS kv_artifacts (key TEXT PRIMARY KEY, value JSONB);");
+  stmts.push("CREATE TABLE IF NOT EXISTS kv_snapshots (key TEXT PRIMARY KEY, value JSONB);");
+  stmts.push("CREATE TABLE IF NOT EXISTS kv_proof_units (key TEXT PRIMARY KEY, value JSONB);");
+  stmts.push("CREATE TABLE IF NOT EXISTS kv_user_states (key TEXT PRIMARY KEY, value JSONB);");
+  stmts.push("CREATE TABLE IF NOT EXISTS kv_events (key TEXT PRIMARY KEY, value JSONB);");
+  stmts.push("");
+
+  function inserts(table: string, rows: Array<{ key: string; value: any }>) {
+    for (const r of rows) {
+      const v = esc(JSON.stringify(r.value));
+      const k = esc(r.key);
+      stmts.push(
+        `INSERT INTO ${table} (key, value) VALUES ('${k}', '${v}'::jsonb) ` +
+          `ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;`
+      );
+    }
+  }
+
+  inserts("kv_artifacts", json.artifacts as any);
+  inserts("kv_snapshots", json.snapshots as any);
+  inserts("kv_proof_units", json.proofUnits as any);
+  inserts("kv_user_states", json.userStates as any);
+  inserts("kv_events", json.events as any);
+
+  return stmts.join("\n");
+}
+
+src/routes/auth.ts
+
+import { Router } from "express";
+import { z } from "zod";
+import { signToken } from "../tokens";
+
+export const authRouter = Router();
+
+authRouter.post("/issue", (req, res) => {
+  const schema = z.object({ userId: z.string().min(1) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const token = signToken(parsed.data.userId);
+  res.json({ token });
+});
+
+src/routes/admin_auth.ts
+
+import { Router } from "express";
+import { z } from "zod";
+import { signAdminToken } from "../admin_tokens";
+
+export const adminAuthRouter = Router();
+
+adminAuthRouter.post("/issue", (req, res) => {
+  const schema = z.object({
+    adminKey: z.string().min(1),
+    scope: z.array(z.string()).min(1).default(["*"]),
+    ttlSeconds: z.number().int().min(60).max(60 * 60 * 24).default(60 * 60),
+  });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const expected = process.env.POW_ADMIN_SECRET;
+  if (!expected) return res.status(500).json({ error: "Server missing POW_ADMIN_SECRET" });
+
+  if (parsed.data.adminKey !== expected) return res.status(403).json({ error: "Forbidden" });
+
+  const token = signAdminToken(parsed.data.scope, parsed.data.ttlSeconds);
+  res.json({ token, scope: parsed.data.scope, ttlSeconds: parsed.data.ttlSeconds });
+});
+
+src/routes/admin.ts
+
+import { Router } from "express";
+import { z } from "zod";
+import { runMigrations } from "../migrations";
+import { exportJsonl, exportJson, importJson, importJsonl } from "../backup";
+import { getDbMeta } from "../versioning";
+import { requireAdminScope } from "../middleware/admin_auth";
+import { ADMIN_SCOPES } from "../middleware/admin_scopes";
+
+export const adminRouter = Router();
+
+adminRouter.get("/meta", requireAdminScope(ADMIN_SCOPES.meta), async (_req, res) => {
+  res.json({ meta: await getDbMeta() });
+});
+
+adminRouter.post("/migrate", requireAdminScope(ADMIN_SCOPES.migrate), async (req, res) => {
+  const schema = z.object({ dryRun: z.boolean().optional(), limit: z.number().int().positive().max(5000).optional() });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  const result = await runMigrations({ dryRun: parsed.data.dryRun, limit: parsed.data.limit });
+  res.json(result);
+});
+
+adminRouter.post("/backup", requireAdminScope(ADMIN_SCOPES.backup), async (req, res) => {
+  const schema = z.object({
+    format: z.enum(["jsonl", "json"]).default("jsonl"),
+    prefixes: z.array(z.string()).min(1),
+    limitPerPrefix: z.number().int().positive().max(50_000).optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  if (parsed.data.format === "jsonl") {
+    const data = await exportJsonl(parsed.data.prefixes, parsed.data.limitPerPrefix);
+    res.setHeader("Content-Type", "text/plain");
+    return res.send(data);
+  } else {
+    const data = await exportJson(parsed.data.prefixes, parsed.data.limitPerPrefix);
+    return res.json({ data });
+  }
+});
+
+adminRouter.post("/restore", requireAdminScope(ADMIN_SCOPES.restore), async (req, res) => {
+  const schema = z.object({ dryRun: z.boolean().default(true), format: z.enum(["jsonl", "json"]), data: z.any() });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  if (parsed.data.format === "json") return res.json(await importJson(parsed.data.data, parsed.data.dryRun));
+  return res.json(await importJsonl(String(parsed.data.data), parsed.data.dryRun));
+});
+
+src/routes/admin_tools.ts
+
+import { Router } from "express";
+import { z } from "zod";
+import { requireAdminScope } from "../middleware/admin_auth";
+import { ADMIN_SCOPES } from "../middleware/admin_scopes";
+import { buildKeyIndex, chunkFromIndex } from "../key_index";
+import { runIntegrityScan } from "../integrity";
+import { db, keys } from "../db";
+import { exportAsJson, exportAsSql } from "../export_postgres";
+
+export const adminToolsRouter = Router();
+
+adminToolsRouter.post("/index/build", requireAdminScope(ADMIN_SCOPES.index), async (req, res) => {
+  const schema = z.object({ prefixes: z.array(z.string()).min(1), dryRun: z.boolean().default(true) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const results = [];
+  for (const p of parsed.data.prefixes) results.push({ prefix: p, ...(await buildKeyIndex(p, parsed.data.dryRun)) });
+  res.json({ results });
+});
+
+adminToolsRouter.post("/backup/chunk", requireAdminScope(ADMIN_SCOPES.backup), async (req, res) => {
+  const schema = z.object({
+    prefix: z.string().min(1),
+    cursor: z.string().nullable().optional(),
+    limit: z.number().int().min(1).max(2000).default(500),
+    format: z.enum(["jsonl", "json"]).default("jsonl"),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const chunk = await chunkFromIndex(parsed.data.prefix, parsed.data.cursor ?? null, parsed.data.limit);
+  if ((chunk as any).error) return res.status(409).json(chunk);
+
+  if (parsed.data.format === "json") {
+    const entries: Record<string, any> = {};
+    for (const k of (chunk as any).keys) entries[k] = await db.get(k);
+    return res.json({ prefix: (chunk as any).prefix, builtAt: (chunk as any).builtAt, nextCursor: (chunk as any).nextCursor, entries });
+  }
+
+  const lines: string[] = [];
+  for (const k of (chunk as any).keys) lines.push(JSON.stringify({ key: k, value: await db.get(k) }));
+  res.setHeader("Content-Type", "text/plain");
+  res.send(JSON.stringify({ prefix: (chunk as any).prefix, builtAt: (chunk as any).builtAt, nextCursor: (chunk as any).nextCursor }) + "\n" + lines.join("\n"));
+});
+
+adminToolsRouter.post("/integrity", requireAdminScope(ADMIN_SCOPES.integrity), async (req, res) => {
+  const schema = z.object({ limitPerPrefix: z.number().int().min(1).max(200_000).default(50_000) });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  res.json(await runIntegrityScan(parsed.data.limitPerPrefix));
+});
+
+adminToolsRouter.post("/repair/reindex", requireAdminScope(ADMIN_SCOPES.repair), async (req, res) => {
+  const schema = z.object({ dryRun: z.boolean().default(true), limit: z.number().int().min(1).max(200_000).default(50_000) });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const dryRun = parsed.data.dryRun;
+  const limit = parsed.data.limit;
+
+  let rebuiltUserArtifactIndexes = 0;
+  let rebuiltUserEventIndexes = 0;
+  let rebuiltArtifactProofIndexes = 0;
+
+  const aKeys = ((await db.list("artifact:")) ?? []).slice(0, limit);
+  const byUser: Record<string, string[]> = {};
+  for (const k of aKeys) {
+    const a = (await db.get(k)) as any;
+    if (!a?.userId || !a?.id) continue;
+    byUser[a.userId] ||= [];
+    byUser[a.userId].push(a.id);
+  }
+  for (const [userId, ids] of Object.entries(byUser)) {
+    if (!dryRun) await db.set(keys.userArtifactsIndex(userId), ids);
+    rebuiltUserArtifactIndexes += 1;
+  }
+
+  const eKeys = ((await db.list("event:")) ?? []).slice(0, limit);
+  const eventsByUser: Record<string, string[]> = {};
+  for (const k of eKeys) {
+    const e = (await db.get(k)) as any;
+    if (!e?.userId || !e?.id) continue;
+    eventsByUser[e.userId] ||= [];
+    eventsByUser[e.userId].push(e.id);
+  }
+  for (const [userId, ids] of Object.entries(eventsByUser)) {
+    if (!dryRun) await db.set(`user_events:${userId}`, ids);
+    rebuiltUserEventIndexes += 1;
+  }
+
+  const pKeys = ((await db.list("proof_unit:")) ?? []).slice(0, limit);
+  const proofsByArtifact: Record<string, string[]> = {};
+  for (const k of pKeys) {
+    const pu = (await db.get(k)) as any;
+    if (!pu?.artifactId || !pu?.id) continue;
+    proofsByArtifact[pu.artifactId] ||= [];
+    proofsByArtifact[pu.artifactId].push(pu.id);
+  }
+  for (const [artifactId, ids] of Object.entries(proofsByArtifact)) {
+    if (!dryRun) await db.set(`artifact_proof_units:${artifactId}`, ids);
+    rebuiltArtifactProofIndexes += 1;
+  }
+
+  res.json({ dryRun, rebuiltUserArtifactIndexes, rebuiltUserEventIndexes, rebuiltArtifactProofIndexes });
+});
+
+adminToolsRouter.post("/compact", requireAdminScope(ADMIN_SCOPES.compact), async (req, res) => {
+  const schema = z.object({ dryRun: z.boolean().default(true), deletePrefixes: z.array(z.string()).min(1), limit: z.number().int().min(1).max(200_000).default(50_000) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  let deleted = 0;
+  for (const prefix of parsed.data.deletePrefixes) {
+    const ks = ((await db.list(prefix)) ?? []).slice(0, parsed.data.limit);
+    for (const k of ks) {
+      deleted += 1;
+      if (!parsed.data.dryRun) await db.delete(k);
+    }
+  }
+  res.json({ dryRun: parsed.data.dryRun, deleted });
+});
+
+adminToolsRouter.post("/export/postgres", requireAdminScope(ADMIN_SCOPES.export), async (req, res) => {
+  const schema = z.object({ format: z.enum(["json", "sql"]).default("json"), limitPerPrefix: z.number().int().min(1).max(200_000).default(50_000) });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  if (parsed.data.format === "json") return res.json({ data: await exportAsJson(parsed.data.limitPerPrefix) });
+
+  res.setHeader("Content-Type", "text/plain");
+  res.send(await exportAsSql(parsed.data.limitPerPrefix));
+});
+
+src/routes/admin_stream_backup.ts
+
+import { Router } from "express";
+import { z } from "zod";
+import zlib from "zlib";
+import { db } from "../db";
+import { chunkFromIndex } from "../key_index";
+import { requireAdminScope } from "../middleware/admin_auth";
+import { ADMIN_SCOPES } from "../middleware/admin_scopes";
+
+export const adminStreamBackupRouter = Router();
+
+adminStreamBackupRouter.post("/backup", requireAdminScope(ADMIN_SCOPES.backup), async (req, res) => {
+  const schema = z.object({
+    prefix: z.string().min(1),
+    cursor: z.string().nullable().optional(),
+    limit: z.number().int().min(1).max(5000).default(500),
+    gzip: z.boolean().default(false),
+  });
+  const parsed = schema.safeParse(req.body ?? {});
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const chunk = await chunkFromIndex(parsed.data.prefix, parsed.data.cursor ?? null, parsed.data.limit);
+  if ((chunk as any).error) return res.status(409).json(chunk);
+
+  res.setHeader("Content-Type", "application/x-ndjson");
+
+  let out: NodeJS.WritableStream = res;
+  if (parsed.data.gzip) {
+    res.setHeader("Content-Encoding", "gzip");
+    const gz = zlib.createGzip({ level: zlib.constants.Z_BEST_SPEED });
+    gz.pipe(res);
+    out = gz;
+  }
+
+  out.write(JSON.stringify({ prefix: (chunk as any).prefix, builtAt: (chunk as any).builtAt, nextCursor: (chunk as any).nextCursor, total: (chunk as any).total }) + "\n");
+  for (const k of (chunk as any).keys as string[]) {
+    out.write(JSON.stringify({ key: k, value: await db.get(k) }) + "\n");
+  }
+
+  (out as any).end?.();
+});
+
+src/routes/artifacts.ts
+
+import { Router } from "express";
+import { z } from "zod";
+import { nanoid } from "nanoid";
+import { db, keys } from "../db";
+import { getUserId } from "../auth";
+import { ArtifactRecord, ArtifactSnapshot, ArtifactType, ArtifactStructure } from "../types";
+import { acquireLock, releaseLock } from "../locks";
+import { writeEvent } from "../audit";
+import { createProofUnit, listProofUnitsForArtifact } from "../proof_units";
+import { incCompletedArtifacts, incRevisionsCreated } from "../user_state";
+import { assignRTVTags, getRTVStatus } from "../rtv";
+import { applyTemplateDefaults, TEMPLATES } from "../templates";
+import { validateFinishCriteria } from "../finish_criteria";
+import { rateLimit } from "../rate_limit";
+
+export const artifactsRouter = Router();
+
+const structureSchema = z.object({
+  audience: z.enum(["internal", "external", "unknown"]),
+  includesWhy: z.boolean(),
+  reusable: z.boolean(),
+  hasStepsOrProcess: z.boolean(),
+  coordinatesToolsOrAgents: z.boolean(),
+  expressesValues: z.boolean(),
+  thinkingOnly: z.boolean(),
+});
+
+const createSchema = z.object({
+  title: z.string().min(1),
+  type: z.enum(["note","sop","checklist","playbook","template","workflow","spec","principles","journal","other"]),
+  body: z.string().default(""),
+  structure: structureSchema.partial().optional(),
+  finishCriteria: z.any().optional(),
+});
+
+const updateSchema = z.object({
+  title: z.string().min(1).optional(),
+  type: createSchema.shape.type.optional(),
+  body: z.string().optional(),
+  structure: structureSchema.partial().optional(),
+  finishCriteria: z.any().optional(),
+});
+
+const proofCreateSchema = z.object({
+  mode: z.enum(["operator","steward"]),
+  proofType: z.enum(["ship","decide","document","automate","review"]),
+  note: z.string().max(500).optional(),
+});
+
+const MIN_PROOF_UNITS_TO_COMPLETE = 1;
+
+async function getArtifact(id: string): Promise<ArtifactRecord | null> {
+  return ((await db.get(keys.artifact(id))) as ArtifactRecord | null) ?? null;
+}
+async function saveArtifact(rec: ArtifactRecord) {
+  await db.set(keys.artifact(rec.id), { _t: "artifact", _v: 1, ...rec });
+}
+async function addArtifactToUserIndex(userId: string, artifactId: string) {
+  const k = keys.userArtifactsIndex(userId);
+  const existing = ((await db.get(k)) as string[] | null) ?? [];
+  if (!existing.includes(artifactId)) {
+    existing.push(artifactId);
+    await db.set(k, existing);
+  }
+}
+
+/** CREATE */
+artifactsRouter.post("/", async (req, res) => {
+  const userId = getUserId(req);
+  const rl = await rateLimit(userId, "artifacts_write", { windowMs: 60_000, max: 60 });
+  if (!rl.ok) return res.status(429).json({ error: "Rate limited", retryAfterSec: rl.retryAfterSec });
+
+  const parsed = createSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  let finishCriteria = undefined;
+  if (parsed.data.finishCriteria !== undefined) {
+    const v = validateFinishCriteria(parsed.data.finishCriteria);
+    if (!v.success) return res.status(400).json({ error: v.error.flatten() });
+    finishCriteria = v.data;
+  }
+
+  const now = new Date().toISOString();
+  const id = nanoid();
+
+  const type = parsed.data.type as ArtifactType;
+  const structure = applyTemplateDefaults(type, parsed.data.structure as Partial<ArtifactStructure>);
+
+  const artifact: ArtifactRecord = {
+    id, userId,
+    title: parsed.data.title,
+    type,
+    structure,
+    status: "draft",
+    createdAt: now,
+    updatedAt: now,
+    finishCriteria,
+  };
+
+  await db.set(`artifact_body:${id}`, parsed.data.body);
+  await saveArtifact(artifact);
+  await addArtifactToUserIndex(userId, id);
+  await writeEvent({ type: "artifact_created", userId, artifactId: id });
+
+  res.json({ artifact });
+});
+
+/** LIST (pagination) */
+artifactsRouter.get("/", async (req, res) => {
+  const userId = getUserId(req);
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)));
+  const cursor = (req.query.cursor as string | undefined) ?? null;
+
+  const ids = ((await db.get(keys.userArtifactsIndex(userId))) as string[] | null) ?? [];
+  const ordered = ids.slice().reverse(); // newest first (insertion order reverse)
+
+  let start = 0;
+  if (cursor) {
+    const idx = ordered.indexOf(cursor);
+    start = idx >= 0 ? idx + 1 : 0;
+  }
+
+  const pageIds = ordered.slice(start, start + limit);
+  const artifacts: ArtifactRecord[] = [];
+  for (const id of pageIds) {
+    const rec = await getArtifact(id);
+    if (rec) artifacts.push(rec);
+  }
+
+  const nextCursor = pageIds.length === limit ? pageIds[pageIds.length - 1] : null;
+  res.json({ artifacts, nextCursor });
+});
+
+/** GET ONE (returns draft body OR snapshot) */
+artifactsRouter.get("/:id", async (req, res) => {
+  const userId = getUserId(req);
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+  if (artifact.status === "complete" && artifact.finalSnapshotId) {
+    const snap = (await db.get(keys.artifactSnapshot(artifact.id, artifact.finalSnapshotId))) as ArtifactSnapshot | null;
+    const status = await getRTVStatus(artifact);
+
+    if (status.eligible) await writeEvent({ type: "rtv_viewed", userId, artifactId: artifact.id });
+
+    return res.json({
+      artifact,
+      snapshot: snap,
+      rtv: {
+        eligible: status.eligible,
+        locked: status.locked,
+        reason: status.reason,
+        unlock: (status as any).unlock,
+        tags: status.eligible ? artifact.rtvTags ?? [] : [],
+      },
+    });
+  }
+
+  const body = ((await db.get(`artifact_body:${artifact.id}`)) as string | null) ?? "";
+  return res.json({ artifact, body, rtv: { eligible: false, locked: false, reason: "not_complete", tags: [] } });
+});
+
+/** PATCH (draft only) */
+artifactsRouter.patch("/:id", async (req, res) => {
+  const userId = getUserId(req);
+  const rl = await rateLimit(userId, "artifacts_write", { windowMs: 60_000, max: 60 });
+  if (!rl.ok) return res.status(429).json({ error: "Rate limited", retryAfterSec: rl.retryAfterSec });
+
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+  if (artifact.status !== "draft") return res.status(409).json({ error: "Cannot edit a completed artifact" });
+
+  const parsed = updateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  if (parsed.data.title !== undefined) artifact.title = parsed.data.title;
+  if (parsed.data.type !== undefined) {
+    artifact.type = parsed.data.type as ArtifactType;
+    artifact.structure = applyTemplateDefaults(artifact.type, artifact.structure);
+  }
+  if (parsed.data.structure) artifact.structure = { ...artifact.structure, ...(parsed.data.structure as any) };
+  if (parsed.data.body !== undefined) await db.set(`artifact_body:${artifact.id}`, parsed.data.body);
+
+  if (parsed.data.finishCriteria !== undefined) {
+    const v = validateFinishCriteria(parsed.data.finishCriteria);
+    if (!v.success) return res.status(400).json({ error: v.error.flatten() });
+    artifact.finishCriteria = v.data;
+  }
+
+  artifact.updatedAt = new Date().toISOString();
+  await saveArtifact(artifact);
+  await writeEvent({ type: "artifact_updated", userId, artifactId: artifact.id });
+
+  res.json({ artifact });
+});
+
+/** PROOF UNIT CREATE (draft only) */
+artifactsRouter.post("/:id/proof-units", async (req, res) => {
+  const userId = getUserId(req);
+  const rl = await rateLimit(userId, "artifacts_write", { windowMs: 60_000, max: 60 });
+  if (!rl.ok) return res.status(429).json({ error: "Rate limited", retryAfterSec: rl.retryAfterSec });
+
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+  if (artifact.status !== "draft") return res.status(409).json({ error: "Cannot add proof units to a completed artifact" });
+
+  const parsed = proofCreateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const pu = await createProofUnit({
+    userId,
+    artifactId: artifact.id,
+    mode: parsed.data.mode,
+    proofType: parsed.data.proofType,
+    note: parsed.data.note,
+  });
+
+  await writeEvent({ type: "artifact_updated", userId, artifactId: artifact.id, meta: { proofUnitId: pu.id, mode: pu.mode, proofType: pu.proofType } });
+  res.json({ proofUnit: pu });
+});
+
+/** PROOF UNIT LIST */
+artifactsRouter.get("/:id/proof-units", async (req, res) => {
+  const userId = getUserId(req);
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+  res.json({ proofUnits: await listProofUnitsForArtifact(userId, artifact.id) });
+});
+
+/** COMPLETE (lock + proof gate + template gate + finishCriteria + snapshot) */
+const completeSchema = z.object({
+  body: z.string().optional(),
+  finishSummary: z.string().min(10).max(500),
+});
+
+artifactsRouter.post("/:id/complete", async (req, res) => {
+  const userId = getUserId(req);
+  const rl = await rateLimit(userId, "artifact_complete", { windowMs: 60_000, max: 10 });
+  if (!rl.ok) return res.status(429).json({ error: "Rate limited", retryAfterSec: rl.retryAfterSec });
+
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+  const lock = await acquireLock("artifact", artifact.id, userId, 10_000);
+  if (!lock.ok) return res.status(409).json({ error: "Artifact is locked. Try again." });
+
+  try {
+    if (artifact.status === "complete") return res.status(409).json({ error: "Already complete" });
+    const parsed = completeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+    if (artifact.structure.thinkingOnly) return res.status(409).json({ error: "Thinking-only artifacts cannot be completed." });
+    if (artifact.type === "journal") return res.status(409).json({ error: "Journal artifacts cannot be completed." });
+
+    const proofUnits = await listProofUnitsForArtifact(userId, artifact.id);
+    if (proofUnits.length < MIN_PROOF_UNITS_TO_COMPLETE) {
+      return res.status(409).json({ error: `At least ${MIN_PROOF_UNITS_TO_COMPLETE} proof unit(s) required to complete.` });
+    }
+
+    const template = TEMPLATES[artifact.type] ?? TEMPLATES.other;
+
+    if (template.completionRequires.includes("finishCriteria")) {
+      if (!artifact.finishCriteria) return res.status(409).json({ error: "Finish criteria required to complete this artifact type." });
+      const v = validateFinishCriteria(artifact.finishCriteria);
+      if (!v.success) return res.status(409).json({ error: "Invalid finish criteria. Please fix before completing." });
+    }
+
+    for (const reqKey of template.completionRequires) {
+      if (reqKey === "finishCriteria") continue;
+      if ((artifact.structure as any)[reqKey] !== true) {
+        return res.status(409).json({ error: `Completion requires structure flag: ${reqKey}` });
+      }
+    }
+
+    const now = new Date().toISOString();
+    const snapshotId = nanoid();
+
+    const existingBody = ((await db.get(`artifact_body:${artifact.id}`)) as string | null) ?? "";
+    const body = parsed.data.body ?? existingBody;
+
+    const snapshot: ArtifactSnapshot = {
+      _t: "artifact_snapshot",
+      _v: 1,
+      artifactId: artifact.id,
+      snapshotId,
+      frozenAt: now,
+      title: artifact.title,
+      type: artifact.type,
+      structure: artifact.structure,
+      body,
+      finishCriteria: artifact.finishCriteria,
+      finishSummary: parsed.data.finishSummary,
+    };
+
+    await db.set(keys.artifactSnapshot(artifact.id, snapshotId), snapshot);
+
+    artifact.status = "complete";
+    artifact.completedAt = now;
+    artifact.finalSnapshotId = snapshotId;
+    artifact.finishSummary = parsed.data.finishSummary;
+    artifact.rtvTags = assignRTVTags(artifact);
+    artifact.updatedAt = now;
+
+    await saveArtifact(artifact);
+
+    // delete draft body after completion (immutability)
+    await db.delete(`artifact_body:${artifact.id}`);
+
+    await incCompletedArtifacts(userId, 1);
+
+    await writeEvent({
+      type: "artifact_completed",
+      userId,
+      artifactId: artifact.id,
+      meta: { snapshotId, proofUnits: proofUnits.length, rtvTags: artifact.rtvTags },
+    });
+
+    const status = await getRTVStatus(artifact);
+
+    res.json({
+      artifact,
+      snapshotId,
+      rtv: {
+        eligible: status.eligible,
+        locked: status.locked,
+        reason: status.reason,
+        unlock: (status as any).unlock,
+        tags: status.eligible ? artifact.rtvTags : [],
+      },
+    });
+  } finally {
+    await releaseLock("artifact", artifact.id, userId);
+  }
+});
+
+/** REVISE (snapshot -> new draft) */
+const reviseSchema = z.object({ title: z.string().min(1).optional() });
+
+artifactsRouter.post("/:id/revise", async (req, res) => {
+  const userId = getUserId(req);
+  const rl = await rateLimit(userId, "artifacts_write", { windowMs: 60_000, max: 60 });
+  if (!rl.ok) return res.status(429).json({ error: "Rate limited", retryAfterSec: rl.retryAfterSec });
+
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+  if (artifact.status !== "complete" || !artifact.finalSnapshotId) return res.status(409).json({ error: "Only completed artifacts can be revised" });
+
+  const parsed = reviseSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+
+  const snap = (await db.get(keys.artifactSnapshot(artifact.id, artifact.finalSnapshotId))) as ArtifactSnapshot | null;
+  if (!snap) return res.status(404).json({ error: "Snapshot not found" });
+
+  const now = new Date().toISOString();
+  const newId = nanoid();
+
+  const newArtifact: ArtifactRecord = {
+    id: newId,
+    userId,
+    title: parsed.data.title ?? `${snap.title} (revise)`,
+    type: snap.type,
+    structure: snap.structure,
+    status: "draft",
+    createdAt: now,
+    updatedAt: now,
+    finishCriteria: snap.finishCriteria,
+    parentArtifactId: artifact.id,
+    parentSnapshotId: snap.snapshotId,
+  };
+
+  await db.set(`artifact_body:${newId}`, snap.body);
+  await saveArtifact(newArtifact);
+  await addArtifactToUserIndex(userId, newId);
+
+  await incRevisionsCreated(userId, 1);
+
+  await writeEvent({ type: "artifact_revised", userId, artifactId: newId, meta: { parentArtifactId: artifact.id, parentSnapshotId: snap.snapshotId } });
+
+  res.json({ artifact: newArtifact });
+});
+
+/** GET SNAPSHOT */
+artifactsRouter.get("/:id/snapshot/:snapshotId", async (req, res) => {
+  const userId = getUserId(req);
+  const artifact = await getArtifact(req.params.id);
+  if (!artifact || artifact.userId !== userId) return res.status(404).json({ error: "Not found" });
+
+  const snap = await db.get(keys.artifactSnapshot(req.params.id, req.params.snapshotId));
+  if (!snap) return res.status(404).json({ error: "Snapshot not found" });
+
+  res.json({ snapshot: snap });
+});
+
+src/index.ts
+
+import express from "express";
+import cors from "cors";
+import { requireUser } from "./auth";
+
+import { authRouter } from "./routes/auth";
+import { artifactsRouter } from "./routes/artifacts";
+
+import { adminAuthRouter } from "./routes/admin_auth";
+import { adminRouter } from "./routes/admin";
+import { adminToolsRouter } from "./routes/admin_tools";
+import { adminStreamBackupRouter } from "./routes/admin_stream_backup";
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+
+app.get("/", (_req, res) => res.json({ ok: true, service: "pow-api", version: "mvp-packs-a-f" }));
+
+// Public token issuance
+app.use("/auth", authRouter);
+
+// Admin token issuance (uses POW_ADMIN_SECRET once)
+app.use("/admin/auth", adminAuthRouter);
+
+// Admin endpoints (bearer admin token required inside routes)
+app.use("/admin", adminRouter);
+app.use("/admin/tools", adminToolsRouter);
+app.use("/admin/stream", adminStreamBackupRouter);
+
+// Protected user routes
+app.use(requireUser);
+app.use("/api/artifacts", artifactsRouter);
+
+const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+app.listen(port, () => console.log(`POW MVP running on port ${port}`));
+
+
+⸻
+
+3) Quick smoke test (copy/paste)
+
+1) User token
+
+curl -X POST "$REPLIT_DEV_URL/auth/issue" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"jsama"}'
+
+Set USER_TOKEN.
+
+2) Create artifact (includes finishCriteria)
+
+curl -X POST "$REPLIT_DEV_URL/api/artifacts" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title":"Client Intake SOP v1",
+    "type":"sop",
+    "body":"Step 1... Step 2...",
+    "finishCriteria":{
+      "doneDefinition":"Another person can execute intake without questions.",
+      "checks":["Inputs defined","Outputs defined","Steps listed"]
+    },
+    "structure":{"audience":"external","includesWhy":true}
+  }'
+
+3) Add proof unit
+
+curl -X POST "$REPLIT_DEV_URL/api/artifacts/<ID>/proof-units" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"mode":"operator","proofType":"document","note":"Wrote clear steps and scope"}'
+
+4) Complete
+
+curl -X POST "$REPLIT_DEV_URL/api/artifacts/<ID>/complete" \
+  -H "Authorization: Bearer $USER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"finishSummary":"Finalized SOP, verified readability, froze v1."}'
+
+5) Get artifact (returns snapshot + RTV status)
+
+curl "$REPLIT_DEV_URL/api/artifacts/<ID>" \
+  -H "Authorization: Bearer $USER_TOKEN"
+
+
+⸻
+
+4) Admin flow (build indexes + streaming gzip backup)
+
+Issue admin token
+
+curl -X POST "$REPLIT_DEV_URL/admin/auth/issue" \
+  -H "Content-Type: application/json" \
+  -d '{"adminKey":"'"$POW_ADMIN_SECRET"'","scope":["*"],"ttlSeconds":3600}'
+
+Set ADMIN_TOKEN.
+
+Build key indexes (required for chunk/stream)
+
+curl -X POST "$REPLIT_DEV_URL/admin/tools/index/build" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"dryRun":false,"prefixes":["artifact:","artifact_snapshot:","proof_unit:","user_state:","event:","user_artifacts_index:","user_events:","artifact_proof_units:","db_meta"]}'
+
+Stream backup chunk (gzip)
+
+curl -X POST "$REPLIT_DEV_URL/admin/stream/backup" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"prefix":"artifact:","cursor":null,"limit":500,"gzip":true}' \
+  --output artifact_chunk_000.ndjson.gz
+
+
+⸻
+
+If you want the frontend next
+
+Say: “Generate a minimal React UI for this (Replit) + fetch flows” and I’ll give you a dead-simple UI:
+	•	login (issue token)
+	•	create/edit artifact
+	•	add proof unit
+	•	complete
+	•	view snapshot + RTV lock state
