@@ -1,0 +1,136 @@
+import type {
+  ArtifactRecord,
+  ArtifactSnapshotRecord,
+  ProofUnitRecord,
+  ArtifactType,
+  FinishCriteria,
+  ArtifactStructure,
+  RTVResponse,
+} from "@shared/schema";
+
+const TOKEN_KEY = "pow_user_token";
+const USERID_KEY = "pow_user_id";
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string): void {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function clearToken(): void {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+export function getUserId(): string | null {
+  return localStorage.getItem(USERID_KEY);
+}
+
+export function setUserId(userId: string): void {
+  localStorage.setItem(USERID_KEY, userId);
+}
+
+export function clearUserId(): void {
+  localStorage.removeItem(USERID_KEY);
+}
+
+async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string>),
+  };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(path, { ...init, headers });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+
+  if (!res.ok) throw new Error(data?.error ? JSON.stringify(data.error) : `HTTP ${res.status}`);
+  return data as T;
+}
+
+export async function issueToken(userId: string): Promise<{ token: string }> {
+  return http<{ token: string }>("/auth/issue", {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
+export async function listArtifacts(limit = 20, cursor: string | null = null): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }> {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  return http<{ artifacts: ArtifactRecord[]; nextCursor: string | null }>(`/api/artifacts?${qs.toString()}`);
+}
+
+export async function createArtifact(input: {
+  title: string;
+  type: ArtifactType;
+  body: string;
+  structure?: Partial<ArtifactStructure>;
+  finishCriteria?: FinishCriteria;
+}): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>("/api/artifacts", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export type ArtifactGetResponse = 
+  | { artifact: ArtifactRecord; body: string; rtv: RTVResponse }
+  | { artifact: ArtifactRecord; snapshot: ArtifactSnapshotRecord | null; rtv: RTVResponse };
+
+export async function getArtifact(id: string): Promise<ArtifactGetResponse> {
+  return http<ArtifactGetResponse>(`/api/artifacts/${id}`);
+}
+
+export async function updateArtifact(id: string, input: Partial<{
+  title: string;
+  type: ArtifactType;
+  body: string;
+  structure: Partial<ArtifactStructure>;
+  finishCriteria: FinishCriteria;
+}>): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function listProofUnits(id: string): Promise<{ proofUnits: ProofUnitRecord[] }> {
+  return http<{ proofUnits: ProofUnitRecord[] }>(`/api/artifacts/${id}/proof-units`);
+}
+
+export async function addProofUnit(id: string, input: { 
+  mode: ProofUnitRecord["mode"]; 
+  proofType: ProofUnitRecord["proofType"]; 
+  note?: string 
+}): Promise<{ proofUnit: ProofUnitRecord }> {
+  return http<{ proofUnit: ProofUnitRecord }>(`/api/artifacts/${id}/proof-units`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function completeArtifact(id: string, input: { 
+  finishSummary: string; 
+  body?: string 
+}): Promise<{ artifact: ArtifactRecord; snapshotId: string; rtv: RTVResponse }> {
+  return http<{ artifact: ArtifactRecord; snapshotId: string; rtv: RTVResponse }>(`/api/artifacts/${id}/complete`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function reviseArtifact(id: string, input: { title?: string }): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/revise`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getSnapshot(id: string, snapshotId: string): Promise<{ snapshot: ArtifactSnapshotRecord }> {
+  return http<{ snapshot: ArtifactSnapshotRecord }>(`/api/artifacts/${id}/snapshot/${snapshotId}`);
+}
