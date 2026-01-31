@@ -11,6 +11,12 @@ POW is an artifact tracking application that helps users document their work wit
 - **Revisions**: Create new drafts from completed artifacts
 - **RTV Tags**: Automatic tagging based on artifact structure (internal_leverage, client_facing_assets, etc.)
 
+## Phase 1 Features
+- **Search & Filter**: Search artifacts by title, filter by type and status (draft/complete/archived)
+- **Archive System**: Archive completed artifacts to hide from default view, restore when needed
+- **Markdown Export**: Export completed artifacts as .md files with metadata
+- **Activity Log**: Track all major actions (created, updated, proof_added, completed, revised, archived, restored)
+
 ## Tech Stack
 - **Frontend**: React with TypeScript, TailwindCSS, shadcn/ui components
 - **Backend**: Express.js with TypeScript
@@ -51,7 +57,7 @@ shared/
 
 ## API Endpoints
 - `POST /auth/issue` - Issue authentication token
-- `GET /api/artifacts` - List user's artifacts (paginated)
+- `GET /api/artifacts` - List user's artifacts (paginated, with search/filter params)
 - `POST /api/artifacts` - Create new artifact
 - `GET /api/artifacts/:id` - Get artifact details
 - `PATCH /api/artifacts/:id` - Update draft artifact
@@ -60,6 +66,9 @@ shared/
 - `POST /api/artifacts/:id/complete` - Complete artifact
 - `POST /api/artifacts/:id/revise` - Create revision from completed artifact
 - `GET /api/artifacts/:id/snapshot/:snapshotId` - Get snapshot
+- `POST /api/artifacts/:id/archive` - Archive completed artifact
+- `POST /api/artifacts/:id/restore` - Restore archived artifact
+- `GET /api/activity-events` - List activity events for user
 
 ## Environment Variables
 - `DATABASE_URL` - PostgreSQL connection string (auto-configured)
