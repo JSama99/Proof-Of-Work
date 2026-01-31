@@ -9,8 +9,13 @@ export const artifactTypeEnum = z.enum([
 ]);
 export type ArtifactType = z.infer<typeof artifactTypeEnum>;
 
-export const artifactStatusEnum = z.enum(["draft", "complete"]);
+export const artifactStatusEnum = z.enum(["draft", "complete", "archived"]);
 export type ArtifactStatus = z.infer<typeof artifactStatusEnum>;
+
+export const activityEventTypeEnum = z.enum([
+  "created", "updated", "proof_added", "completed", "revised", "archived", "restored"
+]);
+export type ActivityEventType = z.infer<typeof activityEventTypeEnum>;
 
 export const audienceEnum = z.enum(["internal", "external", "unknown"]);
 export type Audience = z.infer<typeof audienceEnum>;
@@ -97,6 +102,15 @@ export const userStates = pgTable("user_states", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const activityEvents = pgTable("activity_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  artifactId: varchar("artifact_id", { length: 36 }),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertArtifactSchema = createInsertSchema(artifacts).omit({
   id: true,
   createdAt: true,
@@ -113,6 +127,7 @@ export type InsertArtifact = z.infer<typeof insertArtifactSchema>;
 export type ArtifactSnapshot = typeof artifactSnapshots.$inferSelect;
 export type ProofUnit = typeof proofUnits.$inferSelect;
 export type UserState = typeof userStates.$inferSelect;
+export type ActivityEvent = typeof activityEvents.$inferSelect;
 
 export interface ArtifactRecord {
   id: string;
@@ -168,6 +183,21 @@ export interface RTVResponse {
     };
   };
   tags: RTVTag[];
+}
+
+export interface ActivityEventRecord {
+  id: string;
+  userId: string;
+  artifactId?: string;
+  eventType: ActivityEventType;
+  metadata?: {
+    artifactTitle?: string;
+    proofMode?: string;
+    proofType?: string;
+    oldStatus?: string;
+    newStatus?: string;
+  };
+  createdAt: string;
 }
 
 export const DEFAULT_STRUCTURE: ArtifactStructure = {

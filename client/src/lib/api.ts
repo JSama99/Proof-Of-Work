@@ -2,6 +2,7 @@ import type {
   ArtifactRecord,
   ArtifactSnapshotRecord,
   ProofUnitRecord,
+  ActivityEventRecord,
   ArtifactType,
   FinishCriteria,
   ArtifactStructure,
@@ -58,10 +59,25 @@ export async function issueToken(userId: string): Promise<{ token: string }> {
   });
 }
 
-export async function listArtifacts(limit = 20, cursor: string | null = null): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }> {
+export interface ListArtifactsFilters {
+  search?: string;
+  type?: ArtifactType;
+  status?: "draft" | "complete" | "archived" | "all";
+  includeArchived?: boolean;
+}
+
+export async function listArtifacts(
+  limit = 20, 
+  cursor: string | null = null,
+  filters?: ListArtifactsFilters
+): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }> {
   const qs = new URLSearchParams();
   qs.set("limit", String(limit));
   if (cursor) qs.set("cursor", cursor);
+  if (filters?.search) qs.set("search", filters.search);
+  if (filters?.type) qs.set("type", filters.type);
+  if (filters?.status) qs.set("status", filters.status);
+  if (filters?.includeArchived) qs.set("includeArchived", "true");
   return http<{ artifacts: ArtifactRecord[]; nextCursor: string | null }>(`/api/artifacts?${qs.toString()}`);
 }
 
@@ -133,4 +149,26 @@ export async function reviseArtifact(id: string, input: { title?: string }): Pro
 
 export async function getSnapshot(id: string, snapshotId: string): Promise<{ snapshot: ArtifactSnapshotRecord }> {
   return http<{ snapshot: ArtifactSnapshotRecord }>(`/api/artifacts/${id}/snapshot/${snapshotId}`);
+}
+
+export async function archiveArtifact(id: string): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/archive`, {
+    method: "POST",
+  });
+}
+
+export async function restoreArtifact(id: string): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/restore`, {
+    method: "POST",
+  });
+}
+
+export async function listActivityEvents(
+  limit = 50, 
+  cursor: string | null = null
+): Promise<{ events: ActivityEventRecord[]; nextCursor: string | null }> {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  return http<{ events: ActivityEventRecord[]; nextCursor: string | null }>(`/api/activity?${qs.toString()}`);
 }

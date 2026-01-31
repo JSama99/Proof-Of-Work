@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
-import { artifacts, proofUnits, userStates } from "@shared/schema";
+import { artifacts, proofUnits, userStates, artifactSnapshots } from "@shared/schema";
 
 const DEMO_USER_ID = "demo";
 
@@ -228,7 +228,8 @@ Share information openly unless there's a specific reason for confidentiality.
         expressesValues: true,
         thinkingOnly: false,
       },
-      status: "draft",
+      status: "complete",
+      finalSnapshotId: snapshotId,
       finishCriteria: {
         doneDefinition: "Guidelines are complete when the team has reviewed and agreed",
         checks: [
@@ -236,11 +237,64 @@ Share information openly unless there's a specific reason for confidentiality.
           "Guidelines are accessible in the team handbook",
         ],
       },
+      finishSummary: "Team communication guidelines have been reviewed and approved by all team members. Ready for use.",
+      rtvTags: ["internal_leverage"],
+      completedAt: oneDayAgo,
       createdAt: threeDaysAgo,
-      updatedAt: threeDaysAgo,
+      updatedAt: oneDayAgo,
     },
   ]);
   
+  await db.insert(artifactSnapshots).values({
+    artifactId: artifact4Id,
+    snapshotId: snapshotId,
+    frozenAt: oneDayAgo,
+    title: "Team Communication Guidelines",
+    type: "principles",
+    structure: {
+      audience: "internal",
+      includesWhy: true,
+      reusable: true,
+      hasStepsOrProcess: false,
+      coordinatesToolsOrAgents: false,
+      expressesValues: true,
+      thinkingOnly: false,
+    },
+    body: `# Team Communication Guidelines
+
+## Core Principles
+
+### 1. Clarity Over Speed
+Take the time to communicate clearly. A well-written message saves time for everyone.
+
+### 2. Assume Positive Intent
+When reading messages, assume the sender has good intentions. Tone is hard to convey in text.
+
+### 3. Respect Time Zones
+Be mindful of teammates in different time zones. Use async communication when possible.
+
+### 4. Document Decisions
+Important decisions should be documented and shared, not just discussed in meetings.
+
+### 5. Default to Transparency
+Share information openly unless there's a specific reason for confidentiality.
+
+## Communication Channels
+
+- **Slack**: Quick questions, updates, casual chat
+- **Email**: External communication, formal announcements
+- **Notion**: Documentation, project planning
+- **Video Calls**: Complex discussions, team bonding`,
+    finishCriteria: {
+      doneDefinition: "Guidelines are complete when the team has reviewed and agreed",
+      checks: [
+        "All team members have reviewed the guidelines",
+        "Guidelines are accessible in the team handbook",
+      ],
+    },
+    finishSummary: "Team communication guidelines have been reviewed and approved by all team members. Ready for use.",
+  });
+
   await db.insert(proofUnits).values([
     {
       id: nanoid(),

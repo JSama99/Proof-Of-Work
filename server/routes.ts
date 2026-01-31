@@ -38,7 +38,13 @@ export async function registerRoutes(
       const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 20, 1), 100);
       const cursor = (req.query.cursor as string) || null;
       
-      const result = await storage.listArtifacts(userId, limit, cursor);
+      const filters: { search?: string; type?: string; status?: string; includeArchived?: boolean } = {};
+      if (req.query.search) filters.search = req.query.search as string;
+      if (req.query.type) filters.type = req.query.type as string;
+      if (req.query.status) filters.status = req.query.status as string;
+      if (req.query.includeArchived === "true") filters.includeArchived = true;
+      
+      const result = await storage.listArtifacts(userId, limit, cursor, filters as any);
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Internal error" });
@@ -227,6 +233,49 @@ export async function registerRoutes(
       }
       
       res.json({ snapshot });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.post("/api/artifacts/:id/archive", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const artifact = await storage.archiveArtifact(userId, req.params.id);
+      
+      if (!artifact) {
+        return res.status(404).json({ error: "Artifact not found or cannot be archived" });
+      }
+      
+      res.json({ artifact });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.post("/api/artifacts/:id/restore", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const artifact = await storage.restoreArtifact(userId, req.params.id);
+      
+      if (!artifact) {
+        return res.status(404).json({ error: "Artifact not found or cannot be restored" });
+      }
+      
+      res.json({ artifact });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.get("/api/activity", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
+      const cursor = (req.query.cursor as string) || null;
+      
+      const result = await storage.listActivityEvents(userId, limit, cursor);
+      res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Internal error" });
     }

@@ -1,21 +1,25 @@
 import { nanoid } from "nanoid";
 import { db } from "./db";
-import { eq, desc, and, lt, sql } from "drizzle-orm";
+import { eq, desc, and, lt, sql, ilike, or, ne } from "drizzle-orm";
 import {
   artifacts,
   artifactSnapshots,
   proofUnits,
   userStates,
+  activityEvents,
   type Artifact,
   type ArtifactSnapshot,
   type ProofUnit,
   type UserState,
+  type ActivityEvent,
   type ArtifactRecord,
   type ArtifactSnapshotRecord,
   type ProofUnitRecord,
+  type ActivityEventRecord,
   type ArtifactStructure,
   type FinishCriteria,
   type ArtifactType,
+  type ActivityEventType,
   type RTVTag,
   type RTVResponse,
   DEFAULT_STRUCTURE,
@@ -29,7 +33,7 @@ function toArtifactRecord(a: Artifact): ArtifactRecord {
     type: a.type as ArtifactType,
     structure: a.structure as ArtifactStructure,
     body: a.body,
-    status: a.status as "draft" | "complete",
+    status: a.status as "draft" | "complete" | "archived",
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     completedAt: a.completedAt?.toISOString(),
@@ -39,6 +43,17 @@ function toArtifactRecord(a: Artifact): ArtifactRecord {
     rtvTags: a.rtvTags as RTVTag[] | undefined,
     parentArtifactId: a.parentArtifactId ?? undefined,
     parentSnapshotId: a.parentSnapshotId ?? undefined,
+  };
+}
+
+function toActivityEventRecord(e: ActivityEvent): ActivityEventRecord {
+  return {
+    id: e.id,
+    userId: e.userId,
+    artifactId: e.artifactId ?? undefined,
+    eventType: e.eventType as ActivityEventType,
+    metadata: e.metadata as ActivityEventRecord["metadata"],
+    createdAt: e.createdAt.toISOString(),
   };
 }
 
@@ -68,8 +83,15 @@ function toProofUnitRecord(p: ProofUnit): ProofUnitRecord {
   };
 }
 
+export interface ListArtifactsFilters {
+  search?: string;
+  type?: ArtifactType;
+  status?: "draft" | "complete" | "archived" | "all";
+  includeArchived?: boolean;
+}
+
 export interface IStorage {
-  listArtifacts(userId: string, limit: number, cursor: string | null): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }>;
+  listArtifacts(userId: string, limit: number, cursor: string | null, filters?: ListArtifactsFilters): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }>;
   getArtifact(userId: string, id: string): Promise<ArtifactRecord | null>;
   createArtifact(userId: string, input: {
     title: string;
@@ -95,6 +117,8 @@ export interface IStorage {
   
   completeArtifact(userId: string, id: string, finishSummary: string): Promise<{ artifact: ArtifactRecord; snapshotId: string } | null>;
   reviseArtifact(userId: string, id: string, newTitle?: string): Promise<ArtifactRecord | null>;
+  archiveArtifact(userId: string, id: string): Promise<ArtifactRecord | null>;
+  restoreArtifact(userId: string, id: string): Promise<ArtifactRecord | null>;
   
   getSnapshot(userId: string, artifactId: string, snapshotId: string): Promise<ArtifactSnapshotRecord | null>;
   
@@ -105,24 +129,38 @@ export interface IStorage {
   }>;
   
   getRTVStatus(artifact: ArtifactRecord, userId: string): Promise<RTVResponse>;
+  
+  listActivityEvents(userId: string, limit: number, cursor: string | null): Promise<{ events: ActivityEventRecord[]; nextCursor: string | null }>;
+  logActivityEvent(userId: string, eventType: ActivityEventType, artifactId?: string, metadata?: Record<string, any>): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async listArtifacts(userId: string, limit: number, cursor: string | null): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }> {
-    let query = db.select().from(artifacts)
-      .where(eq(artifacts.userId, userId))
+  async listArtifacts(userId: string, limit: number, cursor: string | null, filters?: ListArtifactsFilters): Promise<{ artifacts: ArtifactRecord[]; nextCursor: string | null }> {
+    const conditions: any[] = [eq(artifacts.userId, userId)];
+    
+    if (filters?.search) {
+      conditions.push(ilike(artifacts.title, `%${filters.search}%`));
+    }
+    
+    if (filters?.type) {
+      conditions.push(eq(artifacts.type, filters.type));
+    }
+    
+    if (filters?.status && filters.status !== "all") {
+      conditions.push(eq(artifacts.status, filters.status));
+    } else if (!filters?.includeArchived && filters?.status !== "archived") {
+      conditions.push(ne(artifacts.status, "archived"));
+    }
+    
+    if (cursor) {
+      conditions.push(lt(artifacts.createdAt, new Date(cursor)));
+    }
+    
+    const results = await db.select().from(artifacts)
+      .where(and(...conditions))
       .orderBy(desc(artifacts.createdAt))
       .limit(limit + 1);
     
-    if (cursor) {
-      const cursorDate = new Date(cursor);
-      query = db.select().from(artifacts)
-        .where(and(eq(artifacts.userId, userId), lt(artifacts.createdAt, cursorDate)))
-        .orderBy(desc(artifacts.createdAt))
-        .limit(limit + 1);
-    }
-    
-    const results = await query;
     const hasMore = results.length > limit;
     const items = hasMore ? results.slice(0, limit) : results;
     const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
@@ -164,6 +202,8 @@ export class DatabaseStorage implements IStorage {
       createdAt: now,
       updatedAt: now,
     }).returning();
+    
+    await this.logActivityEvent(userId, "created", id, { artifactTitle: input.title });
     
     return toArtifactRecord(result[0]);
   }
@@ -224,6 +264,11 @@ export class DatabaseStorage implements IStorage {
     }).returning();
     
     await this.updateUserState(userId, { mode: input.mode });
+    await this.logActivityEvent(userId, "proof_added", artifactId, { 
+      artifactTitle: artifact.title,
+      proofMode: input.mode,
+      proofType: input.proofType,
+    });
     
     return toProofUnitRecord(result[0]);
   }
@@ -267,6 +312,7 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     await this.updateUserState(userId, { completedArtifact: true });
+    await this.logActivityEvent(userId, "completed", id, { artifactTitle: existing.title });
     
     return result[0] ? { artifact: toArtifactRecord(result[0]), snapshotId } : null;
   }
@@ -302,6 +348,10 @@ export class DatabaseStorage implements IStorage {
     }).returning();
     
     await this.updateUserState(userId, { revision: true });
+    await this.logActivityEvent(userId, "revised", revisedId, { 
+      artifactTitle: title,
+      oldStatus: existing.status,
+    });
     
     return result[0] ? toArtifactRecord(result[0]) : null;
   }
@@ -442,6 +492,72 @@ export class DatabaseStorage implements IStorage {
       },
       tags: artifact.rtvTags || [],
     };
+  }
+
+  async archiveArtifact(userId: string, id: string): Promise<ArtifactRecord | null> {
+    const existing = await this.getArtifact(userId, id);
+    if (!existing) return null;
+    if (existing.status !== "complete") return null;
+    
+    const result = await db.update(artifacts)
+      .set({ status: "archived", updatedAt: new Date() })
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, userId)))
+      .returning();
+    
+    if (result[0]) {
+      await this.logActivityEvent(userId, "archived", id, { artifactTitle: existing.title });
+    }
+    
+    return result[0] ? toArtifactRecord(result[0]) : null;
+  }
+
+  async restoreArtifact(userId: string, id: string): Promise<ArtifactRecord | null> {
+    const existing = await this.getArtifact(userId, id);
+    if (!existing) return null;
+    if (existing.status !== "archived") return null;
+    
+    const result = await db.update(artifacts)
+      .set({ status: "complete", updatedAt: new Date() })
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, userId)))
+      .returning();
+    
+    if (result[0]) {
+      await this.logActivityEvent(userId, "restored", id, { artifactTitle: existing.title });
+    }
+    
+    return result[0] ? toArtifactRecord(result[0]) : null;
+  }
+
+  async listActivityEvents(userId: string, limit: number, cursor: string | null): Promise<{ events: ActivityEventRecord[]; nextCursor: string | null }> {
+    const conditions: any[] = [eq(activityEvents.userId, userId)];
+    
+    if (cursor) {
+      conditions.push(lt(activityEvents.createdAt, new Date(cursor)));
+    }
+    
+    const results = await db.select().from(activityEvents)
+      .where(and(...conditions))
+      .orderBy(desc(activityEvents.createdAt))
+      .limit(limit + 1);
+    
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
+    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
+    
+    return {
+      events: items.map(toActivityEventRecord),
+      nextCursor,
+    };
+  }
+
+  async logActivityEvent(userId: string, eventType: ActivityEventType, artifactId?: string, metadata?: Record<string, any>): Promise<void> {
+    await db.insert(activityEvents).values({
+      id: nanoid(),
+      userId,
+      artifactId: artifactId ?? null,
+      eventType,
+      metadata: metadata ?? null,
+    });
   }
 }
 

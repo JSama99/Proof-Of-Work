@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { reviseArtifact } from "@/lib/api";
+import { reviseArtifact, archiveArtifact, restoreArtifact } from "@/lib/api";
 import type { ArtifactRecord, ArtifactSnapshotRecord, RTVResponse } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,10 @@ import {
   Tag,
   Lock,
   Users,
-  ListChecks
+  ListChecks,
+  Download,
+  Archive,
+  ArchiveRestore
 } from "lucide-react";
 import { format } from "date-fns";
 import { RTVStatus } from "./complete-artifact";
@@ -28,13 +31,15 @@ interface SnapshotViewProps {
   snapshot: ArtifactSnapshotRecord | null;
   rtv: RTVResponse | null;
   onRevise: (newArtifact: ArtifactRecord) => void;
+  onArchiveChange?: () => void;
 }
 
-export function SnapshotView({ artifact, snapshot, rtv, onRevise }: SnapshotViewProps) {
+export function SnapshotView({ artifact, snapshot, rtv, onRevise, onArchiveChange }: SnapshotViewProps) {
   const [isReviseDialogOpen, setIsReviseDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
 
   async function handleRevise() {
     setError(null);
@@ -55,6 +60,60 @@ export function SnapshotView({ artifact, snapshot, rtv, onRevise }: SnapshotView
     }
   }
 
+  async function handleArchive() {
+    setIsArchiving(true);
+    try {
+      await archiveArtifact(artifact.id);
+      onArchiveChange?.();
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(errorMessage);
+    } finally {
+      setIsArchiving(false);
+    }
+  }
+
+  async function handleRestore() {
+    setIsArchiving(true);
+    try {
+      await restoreArtifact(artifact.id);
+      onArchiveChange?.();
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(errorMessage);
+    } finally {
+      setIsArchiving(false);
+    }
+  }
+
+  function handleExport() {
+    const displayBody = snapshot?.body ?? artifact.body ?? "";
+    const displayFinishSummary = snapshot?.finishSummary ?? artifact.finishSummary;
+    
+    const markdown = `# ${artifact.title}
+
+**Type:** ${artifact.type}
+**Status:** ${artifact.status}
+${artifact.completedAt ? `**Completed:** ${format(new Date(artifact.completedAt), "MMMM d, yyyy 'at' h:mm a")}` : ""}
+
+---
+
+${displayFinishSummary ? `## Finish Summary\n\n${displayFinishSummary}\n\n---\n\n` : ""}## Content
+
+${displayBody}
+`;
+
+    const blob = new Blob([markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${artifact.title.replace(/[^a-zA-Z0-9]/g, "_")}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const displayBody = snapshot?.body ?? artifact.body ?? "";
   const displayFinishCriteria = snapshot?.finishCriteria ?? artifact.finishCriteria;
   const displayFinishSummary = snapshot?.finishSummary ?? artifact.finishSummary;
@@ -64,10 +123,17 @@ export function SnapshotView({ artifact, snapshot, rtv, onRevise }: SnapshotView
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Badge variant="default" className="text-xs">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
-              Complete
-            </Badge>
+            {artifact.status === "archived" ? (
+              <Badge variant="outline" className="text-xs">
+                <Archive className="h-3 w-3 mr-1" />
+                Archived
+              </Badge>
+            ) : (
+              <Badge variant="default" className="text-xs">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Complete
+              </Badge>
+            )}
             <Badge variant="outline" className="text-xs">
               {artifact.type}
             </Badge>
@@ -81,14 +147,57 @@ export function SnapshotView({ artifact, snapshot, rtv, onRevise }: SnapshotView
           </div>
         </div>
         
-        <Button 
-          onClick={() => setIsReviseDialogOpen(true)}
-          variant="outline"
-          data-testid="button-revise"
-        >
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Create Revision
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button 
+            onClick={handleExport}
+            variant="outline"
+            data-testid="button-export"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+          
+          {artifact.status === "archived" ? (
+            <Button 
+              onClick={handleRestore}
+              variant="outline"
+              disabled={isArchiving}
+              data-testid="button-restore"
+            >
+              {isArchiving ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <ArchiveRestore className="mr-2 h-4 w-4" />
+              )}
+              Restore
+            </Button>
+          ) : (
+            <>
+              <Button 
+                onClick={handleArchive}
+                variant="outline"
+                disabled={isArchiving}
+                data-testid="button-archive"
+              >
+                {isArchiving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4" />
+                )}
+                Archive
+              </Button>
+              
+              <Button 
+                onClick={() => setIsReviseDialogOpen(true)}
+                variant="outline"
+                data-testid="button-revise"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Create Revision
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {artifact.parentArtifactId && (

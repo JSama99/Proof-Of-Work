@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
-import { listArtifacts } from "@/lib/api";
-import type { ArtifactRecord } from "@shared/schema";
+import { useEffect, useState, useMemo } from "react";
+import { listArtifacts, type ListArtifactsFilters } from "@/lib/api";
+import type { ArtifactRecord, ArtifactType } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   RefreshCw, 
   Plus, 
@@ -21,7 +23,11 @@ import {
   BookMarked,
   Lightbulb,
   BookOpenText,
-  HelpCircle
+  HelpCircle,
+  Search,
+  Archive,
+  Filter,
+  X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -46,12 +52,33 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
   other: HelpCircle,
 };
 
+const ARTIFACT_TYPES: ArtifactType[] = [
+  "note", "sop", "checklist", "playbook", "template", 
+  "workflow", "spec", "principles", "journal", "other"
+];
+
 export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew }: ArtifactListProps) {
   const [artifacts, setArtifacts] = useState<ArtifactRecord[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const filters: ListArtifactsFilters = useMemo(() => {
+    const f: ListArtifactsFilters = {};
+    if (searchQuery.trim()) f.search = searchQuery.trim();
+    if (typeFilter !== "all") f.type = typeFilter as ArtifactType;
+    if (statusFilter === "draft") f.status = "draft";
+    else if (statusFilter === "complete") f.status = "complete";
+    else if (statusFilter === "archived") f.status = "archived";
+    else if (statusFilter === "all") f.includeArchived = true;
+    return f;
+  }, [searchQuery, typeFilter, statusFilter]);
 
   async function load(first = false) {
     setError(null);
@@ -62,7 +89,7 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
     }
     
     try {
-      const result = await listArtifacts(20, first ? null : nextCursor);
+      const result = await listArtifacts(20, first ? null : nextCursor, filters);
       setArtifacts((prev) => (first ? result.artifacts : [...prev, ...result.artifacts]));
       setNextCursor(result.nextCursor);
     } catch (e: unknown) {
@@ -76,28 +103,106 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
 
   useEffect(() => {
     load(true);
-  }, [refreshSignal]);
+  }, [refreshSignal, filters]);
 
   function getTypeIcon(type: string) {
     const Icon = TYPE_ICONS[type] || FileText;
     return <Icon className="h-4 w-4" />;
   }
 
+  const hasActiveFilters = typeFilter !== "all" || statusFilter !== "active";
+
   return (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
       <div className="p-4 border-b border-sidebar-border space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold text-sidebar-foreground">Artifacts</h2>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => load(true)}
-            disabled={isLoading}
-            data-testid="button-refresh-list"
-          >
-            <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={showFilters ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setShowFilters(!showFilters)}
+              data-testid="button-toggle-filters"
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => load(true)}
+              disabled={isLoading}
+              data-testid="button-refresh-list"
+            >
+              <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
+            </Button>
+          </div>
         </div>
+        
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search artifacts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-8"
+            data-testid="input-search"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+              onClick={() => setSearchQuery("")}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        
+        {showFilters && (
+          <div className="space-y-2">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full" data-testid="select-type-filter">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                {ARTIFACT_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full" data-testid="select-status-filter">
+                <SelectValue placeholder="Active" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active (Draft + Complete)</SelectItem>
+                <SelectItem value="draft">Drafts only</SelectItem>
+                <SelectItem value="complete">Complete only</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  setTypeFilter("all");
+                  setStatusFilter("active");
+                }}
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear filters
+              </Button>
+            )}
+          </div>
+        )}
+        
         <Button 
           className="w-full" 
           onClick={onCreateNew}
@@ -157,11 +262,13 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
                     </h3>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <Badge 
-                        variant={artifact.status === "complete" ? "default" : "secondary"}
+                        variant={artifact.status === "complete" ? "default" : artifact.status === "archived" ? "outline" : "secondary"}
                         className="text-xs"
                       >
                         {artifact.status === "complete" ? (
                           <><CheckCircle2 className="h-3 w-3 mr-1" /> Complete</>
+                        ) : artifact.status === "archived" ? (
+                          <><Archive className="h-3 w-3 mr-1" /> Archived</>
                         ) : (
                           <><Clock className="h-3 w-3 mr-1" /> Draft</>
                         )}

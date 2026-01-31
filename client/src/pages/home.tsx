@@ -4,6 +4,7 @@ import { ArtifactEditor } from "@/components/artifact-editor";
 import { ProofUnits } from "@/components/proof-units";
 import { CompleteArtifact, RTVStatus } from "@/components/complete-artifact";
 import { SnapshotView } from "@/components/snapshot-view";
+import { ActivityLog } from "@/components/activity-log";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +17,8 @@ import {
   FileEdit, 
   CheckCircle2, 
   Sparkles,
-  Menu
+  Menu,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -31,6 +33,7 @@ export default function Home({ onLogout }: HomeProps) {
   const [activeTab, setActiveTab] = useState<"edit" | "proof" | "complete">("edit");
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(false);
   
   const [currentArtifact, setCurrentArtifact] = useState<ArtifactRecord | null>(null);
   const [currentSnapshot, setCurrentSnapshot] = useState<ArtifactSnapshotRecord | null>(null);
@@ -109,13 +112,21 @@ export default function Home({ onLogout }: HomeProps) {
     onLogout();
   }, [onLogout]);
 
+  const handleArchiveChange = useCallback(() => {
+    refreshList();
+    setSelectedId(null);
+    setCurrentArtifact(null);
+    setCurrentSnapshot(null);
+    setCurrentRTV(null);
+  }, [refreshList]);
+
   useEffect(() => {
     if (currentArtifact?.status === "complete") {
       setActiveTab("edit");
     }
   }, [currentArtifact?.status]);
 
-  const isComplete = currentArtifact?.status === "complete";
+  const isComplete = currentArtifact?.status === "complete" || currentArtifact?.status === "archived";
 
   const sidebarContent = (
     <ArtifactList
@@ -158,6 +169,14 @@ export default function Home({ onLogout }: HomeProps) {
             <span className="text-sm text-muted-foreground hidden sm:inline" data-testid="text-user-id">
               {userId}
             </span>
+            <Button 
+              variant={showActivityLog ? "secondary" : "ghost"} 
+              size="icon" 
+              onClick={() => setShowActivityLog(!showActivityLog)}
+              data-testid="button-activity-log"
+            >
+              <Activity className="h-4 w-4" />
+            </Button>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout">
               <LogOut className="h-4 w-4" />
@@ -165,17 +184,19 @@ export default function Home({ onLogout }: HomeProps) {
           </div>
         </header>
 
-        <div className="flex-1 overflow-hidden">
-          {isComplete && currentArtifact ? (
-            <ScrollArea className="h-full">
-              <SnapshotView
-                artifact={currentArtifact}
-                snapshot={currentSnapshot}
-                rtv={currentRTV}
-                onRevise={handleRevise}
-              />
-            </ScrollArea>
-          ) : (
+        <div className="flex-1 overflow-hidden flex">
+          <div className="flex-1 overflow-hidden">
+            {(currentArtifact?.status === "complete" || currentArtifact?.status === "archived") && currentArtifact ? (
+              <ScrollArea className="h-full">
+                <SnapshotView
+                  artifact={currentArtifact}
+                  snapshot={currentSnapshot}
+                  rtv={currentRTV}
+                  onRevise={handleRevise}
+                  onArchiveChange={handleArchiveChange}
+                />
+              </ScrollArea>
+            ) : (
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "edit" | "proof" | "complete")} className="h-full flex flex-col">
               <div className="border-b px-4">
                 <TabsList className="h-12">
@@ -245,6 +266,13 @@ export default function Home({ onLogout }: HomeProps) {
                 </TabsContent>
               </div>
             </Tabs>
+            )}
+          </div>
+
+          {showActivityLog && (
+            <div className="hidden lg:block w-80 border-l overflow-hidden">
+              <ActivityLog refreshSignal={refreshSignal} />
+            </div>
           )}
         </div>
       </div>
