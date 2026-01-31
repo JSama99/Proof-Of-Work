@@ -1,0 +1,303 @@
+Short answer: these are good suggestions, and most of them fit the philosophy of the app.
+Long answer: some are high-leverage and aligned, some need guardrails, and a few should be delayed to avoid turning POW into a productivity toy.
+
+I’ll go through them one by one, then give you a recommended implementation order with reasoning.
+
+⸻
+
+Overall take (Critic view)
+
+Your list is strong because:
+	•	It focuses on durability, retrieval, and accountability
+	•	It does not immediately push monetization or gamification
+	•	It mostly respects the draft → freeze → revise model
+
+The risk is:
+	•	Turning POW into a generic notes/task app
+	•	Letting “organization” replace completion
+
+So the right move is selective adoption with constraints.
+
+⸻
+
+1) Export artifacts as PDF / Markdown
+
+Verdict: YES (high value, low risk)
+
+Why it fits
+	•	Export happens after completion
+	•	Reinforces “this is a finished object”
+	•	Supports offline use, audits, sharing, compliance
+
+Guardrails
+	•	Export completed snapshots only, not drafts
+	•	Export content = snapshot body + metadata (type, completedAt, finish summary)
+	•	No auto-sync back in (export is one-way)
+
+Implementation note
+	•	Markdown first (easy, canonical)
+	•	PDF later (render Markdown → PDF)
+
+✅ Strong alignment with POW’s “artifact permanence”
+
+⸻
+
+2) Search / filter artifacts
+
+Verdict: YES (necessary at scale)
+
+Why it fits
+	•	This is retrieval, not optimization
+	•	Becomes essential past ~50 artifacts
+
+Guardrails
+	•	Search by:
+	•	title
+	•	type
+	•	status (draft / complete / archived)
+	•	date
+	•	Avoid “semantic AI search” for now (scope creep)
+
+Critic note
+This should be boring and fast, not “smart”.
+
+✅ Necessary infrastructure feature
+
+⸻
+
+3) Archive functionality
+
+Verdict: YES, with strict semantics
+
+Correct meaning of “Archive” in POW
+	•	Archived ≠ deleted
+	•	Archived ≠ inactive forever
+	•	Archived = “out of current rotation”
+
+Rules
+	•	Only completed artifacts can be archived
+	•	Archived artifacts:
+	•	are hidden from default list
+	•	still searchable
+	•	still exportable
+	•	still count in stats
+
+Why this matters
+	•	Prevents list clutter
+	•	Preserves historical truth
+
+✅ Good, if archive ≠ graveyard
+
+⸻
+
+4) Duplicate artifact
+
+Verdict: YES, but rename to avoid misuse
+
+I would not call this “Duplicate”.
+
+Better names:
+	•	“Fork as Draft”
+	•	“Use as Template”
+
+Rules
+	•	Can duplicate:
+	•	completed artifacts
+	•	Cannot duplicate:
+	•	drafts (forces intent)
+
+What gets copied
+	•	structure
+	•	finish criteria
+	•	body (into new draft)
+	•	NOT proof units
+	•	NOT completion metadata
+
+Why
+This supports reuse without lying about history.
+
+✅ Very aligned if framed as intentional reuse
+
+⸻
+
+5) Proof unit editing / deletion
+
+Verdict: PARTIAL YES (careful)
+
+This is the most sensitive item on your list.
+
+Why it’s risky
+	•	Proof units are evidence
+	•	Editing them post-hoc can undermine trust
+
+Recommended compromise
+	•	Allow:
+	•	typo fixes (edit note text only)
+	•	Disallow:
+	•	changing proof type
+	•	changing mode
+	•	deleting proof units after completion
+
+Hard rules
+	•	Proof units are immutable after artifact completion
+	•	Any edit creates:
+	•	an audit log entry
+
+This keeps honesty intact.
+
+⚠️ Doable, but must be constrained
+
+⸻
+
+6) Activity log / timeline
+
+Verdict: YES (core accountability feature)
+
+Why it fits perfectly
+You already have:
+	•	audit events
+	•	revisions
+	•	snapshots
+
+This just exposes the truth to the user.
+
+What it should show
+	•	Created artifact
+	•	Updated draft
+	•	Added proof unit
+	•	Completed artifact
+	•	Revised artifact
+	•	Archived / restored
+
+What it should NOT do
+	•	No streaks
+	•	No “points”
+	•	No motivational fluff
+
+✅ This strengthens the “proof of work” claim directly
+
+⸻
+
+7) Statistics dashboard
+
+Verdict: YES, but keep it cold and factual
+
+Good metrics
+	•	total artifacts
+	•	completed vs draft
+	•	completion rate
+	•	artifacts by type
+	•	proof types used
+
+Avoid
+	•	“productivity score”
+	•	rankings
+	•	daily pressure
+
+Tone
+This is self-inspection, not performance gamification.
+
+⚠️ Useful, but keep it minimalist
+
+⸻
+
+8) Tags or folders
+
+Verdict: CAUTIOUS YES (tags > folders)
+
+Folders encourage:
+	•	over-organization
+	•	procrastination via sorting
+
+Better approach
+	•	Lightweight tags
+	•	Optional
+	•	Non-required
+	•	Applied manually or automatically
+
+Rules
+	•	Tags do not affect completion
+	•	Tags do not affect RTV
+	•	Tags are not required fields
+
+⚠️ Add later, not early
+
+⸻
+
+9) Linked artifacts
+
+Verdict: YES (high leverage for real systems)
+
+This is quietly powerful.
+
+Examples:
+	•	SOP → references checklist
+	•	Workflow → references spec
+	•	Template → references principles
+
+Rules
+	•	Links are references, not dependencies
+	•	Completing one does not auto-complete another
+	•	Links are visible in snapshot view
+
+This turns POW into a knowledge graph, not just a list.
+
+✅ Strong system-builder feature
+
+⸻
+
+10) Soft delete with trash / recovery
+
+Verdict: YES (non-negotiable)
+
+Why
+	•	Accidental deletion happens
+	•	Trust requires reversibility
+
+Rules
+	•	Deleting moves to trash
+	•	Trash has:
+	•	restore
+	•	permanent delete (admin / explicit)
+	•	Completed artifacts should warn harder
+
+✅ This is table stakes for trust
+
+⸻
+
+Recommended implementation order (important)
+
+Phase 1 — Core usability (do first)
+	1.	Search / filter
+	2.	Export (Markdown)
+	3.	Archive
+	4.	Activity log
+
+Phase 2 — System building
+	5.	Duplicate / Fork as draft
+	6.	Linked artifacts
+	7.	Statistics dashboard
+
+Phase 3 — Careful extensions
+	8.	Proof unit edit (restricted)
+	9.	Tags
+	10.	Trash / recovery UI polish (backend already close)
+
+⸻
+
+Final judgment
+
+Your suggestions are thoughtful and aligned.
+They don’t betray the philosophy.
+
+The key rule to keep POW intact is this:
+
+Nothing should make it easier to avoid finishing.
+Everything should make finished work more durable, visible, and reusable.
+
+If you want, next I can:
+	•	translate this into a feature roadmap
+	•	or write exact backend schema changes for one of these (export, activity log, linked artifacts)
+	•	or help you decide which features belong in v1 vs v1.5 vs v2
+
+Just tell me where to zoom in.
