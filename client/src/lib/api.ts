@@ -62,7 +62,7 @@ export async function issueToken(userId: string): Promise<{ token: string }> {
 export interface ListArtifactsFilters {
   search?: string;
   type?: ArtifactType;
-  status?: "draft" | "complete" | "archived" | "all";
+  status?: "draft" | "complete" | "archived" | "paused" | "all";
   includeArchived?: boolean;
 }
 
@@ -161,6 +161,19 @@ export async function archiveArtifact(id: string): Promise<{ artifact: ArtifactR
 
 export async function restoreArtifact(id: string): Promise<{ artifact: ArtifactRecord }> {
   return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/restore`, {
+    method: "POST",
+  });
+}
+
+export async function pauseArtifact(id: string, reason: string): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/pause`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function resumeArtifact(id: string): Promise<{ artifact: ArtifactRecord }> {
+  return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}/resume`, {
     method: "POST",
   });
 }

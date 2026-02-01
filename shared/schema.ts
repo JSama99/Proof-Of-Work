@@ -9,11 +9,11 @@ export const artifactTypeEnum = z.enum([
 ]);
 export type ArtifactType = z.infer<typeof artifactTypeEnum>;
 
-export const artifactStatusEnum = z.enum(["draft", "complete", "archived"]);
+export const artifactStatusEnum = z.enum(["draft", "complete", "archived", "paused"]);
 export type ArtifactStatus = z.infer<typeof artifactStatusEnum>;
 
 export const activityEventTypeEnum = z.enum([
-  "created", "updated", "proof_added", "completed", "revised", "archived", "restored"
+  "created", "updated", "proof_added", "completed", "revised", "archived", "restored", "paused", "resumed"
 ]);
 export type ActivityEventType = z.infer<typeof activityEventTypeEnum>;
 
@@ -59,6 +59,8 @@ export const artifacts = pgTable("artifacts", {
   body: text("body").notNull().default(""),
   status: varchar("status", { length: 20 }).notNull().default("draft"),
   isScopeExpansion: boolean("is_scope_expansion").notNull().default(false),
+  pauseReason: text("pause_reason"),
+  pausedAt: timestamp("paused_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
@@ -140,6 +142,8 @@ export interface ArtifactRecord {
   body: string;
   status: ArtifactStatus;
   isScopeExpansion: boolean;
+  pauseReason?: string;
+  pausedAt?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;

@@ -270,6 +270,46 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/artifacts/:id/pause", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      
+      const schema = z.object({
+        reason: z.string().min(1).max(1000),
+      });
+      
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues });
+      }
+      
+      const artifact = await storage.pauseArtifact(userId, req.params.id, parsed.data.reason);
+      
+      if (!artifact) {
+        return res.status(404).json({ error: "Artifact not found or cannot be paused" });
+      }
+      
+      res.json({ artifact });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.post("/api/artifacts/:id/resume", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const artifact = await storage.resumeArtifact(userId, req.params.id);
+      
+      if (!artifact) {
+        return res.status(404).json({ error: "Artifact not found or cannot be resumed" });
+      }
+      
+      res.json({ artifact });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
   app.get("/api/activity", requireUser, async (req, res) => {
     try {
       const userId = getUserId(req);

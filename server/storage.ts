@@ -33,8 +33,10 @@ function toArtifactRecord(a: Artifact): ArtifactRecord {
     type: a.type as ArtifactType,
     structure: a.structure as ArtifactStructure,
     body: a.body,
-    status: a.status as "draft" | "complete" | "archived",
+    status: a.status as "draft" | "complete" | "archived" | "paused",
     isScopeExpansion: a.isScopeExpansion,
+    pauseReason: a.pauseReason ?? undefined,
+    pausedAt: a.pausedAt?.toISOString(),
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     completedAt: a.completedAt?.toISOString(),
@@ -123,6 +125,8 @@ export interface IStorage {
   reviseArtifact(userId: string, id: string, newTitle?: string): Promise<ArtifactRecord | null>;
   archiveArtifact(userId: string, id: string): Promise<ArtifactRecord | null>;
   restoreArtifact(userId: string, id: string): Promise<ArtifactRecord | null>;
+  pauseArtifact(userId: string, id: string, reason: string): Promise<ArtifactRecord | null>;
+  resumeArtifact(userId: string, id: string): Promise<ArtifactRecord | null>;
   
   getSnapshot(userId: string, artifactId: string, snapshotId: string): Promise<ArtifactSnapshotRecord | null>;
   
@@ -532,6 +536,51 @@ export class DatabaseStorage implements IStorage {
     
     if (result[0]) {
       await this.logActivityEvent(userId, "restored", id, { artifactTitle: existing.title });
+    }
+    
+    return result[0] ? toArtifactRecord(result[0]) : null;
+  }
+
+  async pauseArtifact(userId: string, id: string, reason: string): Promise<ArtifactRecord | null> {
+    const existing = await this.getArtifact(userId, id);
+    if (!existing) return null;
+    if (existing.status !== "draft") return null;
+    
+    const now = new Date();
+    const result = await db.update(artifacts)
+      .set({ 
+        status: "paused", 
+        pauseReason: reason,
+        pausedAt: now,
+        updatedAt: now 
+      })
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, userId)))
+      .returning();
+    
+    if (result[0]) {
+      await this.logActivityEvent(userId, "paused", id, { artifactTitle: existing.title, pauseReason: reason });
+    }
+    
+    return result[0] ? toArtifactRecord(result[0]) : null;
+  }
+
+  async resumeArtifact(userId: string, id: string): Promise<ArtifactRecord | null> {
+    const existing = await this.getArtifact(userId, id);
+    if (!existing) return null;
+    if (existing.status !== "paused") return null;
+    
+    const result = await db.update(artifacts)
+      .set({ 
+        status: "draft", 
+        pauseReason: null,
+        pausedAt: null,
+        updatedAt: new Date() 
+      })
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, userId)))
+      .returning();
+    
+    if (result[0]) {
+      await this.logActivityEvent(userId, "resumed", id, { artifactTitle: existing.title });
     }
     
     return result[0] ? toArtifactRecord(result[0]) : null;

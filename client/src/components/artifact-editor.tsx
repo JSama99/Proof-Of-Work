@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createArtifact, getArtifact, updateArtifact, type ArtifactGetResponse } from "@/lib/api";
+import { createArtifact, getArtifact, updateArtifact, pauseArtifact, resumeArtifact, type ArtifactGetResponse } from "@/lib/api";
 import type { ArtifactStructure, ArtifactType, FinishCriteria, ArtifactRecord } from "@shared/schema";
 import { DEFAULT_STRUCTURE } from "@shared/schema";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Plus, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Loader2, Save, Plus, FileText, CheckCircle2, AlertTriangle, Pause, Play } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const ARTIFACT_TYPES: ArtifactType[] = [
@@ -54,6 +55,11 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
 
   const [doneDefinition, setDoneDefinition] = useState("");
   const [checksText, setChecksText] = useState("");
+  
+  const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
+  const [isPausing, setIsPausing] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
 
   const finishCriteria: FinishCriteria | undefined = useMemo(() => {
     const checks = safeParseChecks(checksText);
@@ -162,7 +168,42 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
     }
   }
 
+  async function handlePause() {
+    if (!artifactId || !pauseReason.trim()) return;
+    setError(null);
+    setIsPausing(true);
+    try {
+      const result = await pauseArtifact(artifactId, pauseReason.trim());
+      setArtifact(result.artifact);
+      setPauseReason("");
+      setIsPauseDialogOpen(false);
+      refreshList();
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(errorMessage);
+    } finally {
+      setIsPausing(false);
+    }
+  }
+
+  async function handleResume() {
+    if (!artifactId) return;
+    setError(null);
+    setIsResuming(true);
+    try {
+      const result = await resumeArtifact(artifactId);
+      setArtifact(result.artifact);
+      refreshList();
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(errorMessage);
+    } finally {
+      setIsResuming(false);
+    }
+  }
+
   const isComplete = artifact?.status === "complete";
+  const isPaused = artifact?.status === "paused";
 
   if (isLoading) {
     return (
@@ -181,12 +222,14 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
         <div className="flex items-center gap-3">
           <div className={cn(
             "p-2 rounded-lg",
-            mode === "create" ? "bg-primary/10" : isComplete ? "bg-green-500/10" : "bg-muted"
+            mode === "create" ? "bg-primary/10" : isComplete ? "bg-green-500/10" : isPaused ? "bg-blue-500/10" : "bg-muted"
           )}>
             {mode === "create" ? (
               <Plus className="h-5 w-5 text-primary" />
             ) : isComplete ? (
               <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+            ) : isPaused ? (
+              <Pause className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             ) : (
               <FileText className="h-5 w-5 text-muted-foreground" />
             )}
@@ -196,7 +239,10 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
               {mode === "create" ? "Create Artifact" : "Edit Artifact"}
             </h2>
             {artifact && (
-              <Badge variant={isComplete ? "default" : "secondary"} className="mt-1">
+              <Badge 
+                variant={isComplete ? "default" : isPaused ? "outline" : "secondary"} 
+                className={cn("mt-1", isPaused && "text-blue-600 dark:text-blue-400 border-blue-500/50")}
+              >
                 {artifact.status}
               </Badge>
             )}
@@ -212,13 +258,65 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
             )}
           </Button>
         ) : (
-          <Button onClick={handleSave} disabled={isSaving || isComplete} data-testid="button-save-draft">
-            {isSaving ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
-            ) : (
-              <><Save className="mr-2 h-4 w-4" /> Save Draft</>
+          <div className="flex items-center gap-2 flex-wrap">
+            {isPaused ? (
+              <Button onClick={handleResume} disabled={isResuming} variant="outline" data-testid="button-resume">
+                {isResuming ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Resuming...</>
+                ) : (
+                  <><Play className="mr-2 h-4 w-4" /> Resume</>
+                )}
+              </Button>
+            ) : !isComplete && (
+              <Dialog open={isPauseDialogOpen} onOpenChange={setIsPauseDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-pause">
+                    <Pause className="mr-2 h-4 w-4" /> Pause
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Pause Artifact</DialogTitle>
+                    <DialogDescription>
+                      Record why you're pausing work on this artifact. This helps maintain clarity when you return.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-2 py-4">
+                    <Label htmlFor="pauseReason">Reason for pausing</Label>
+                    <Textarea
+                      id="pauseReason"
+                      placeholder="e.g., Waiting for feedback, Need more research, Blocked by dependency..."
+                      value={pauseReason}
+                      onChange={(e) => setPauseReason(e.target.value)}
+                      className="min-h-[100px]"
+                      data-testid="input-pause-reason"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsPauseDialogOpen(false)}>Cancel</Button>
+                    <Button 
+                      onClick={handlePause} 
+                      disabled={isPausing || !pauseReason.trim()}
+                      data-testid="button-confirm-pause"
+                    >
+                      {isPausing ? (
+                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Pausing...</>
+                      ) : (
+                        <><Pause className="mr-2 h-4 w-4" /> Pause Artifact</>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
-          </Button>
+            <Button onClick={handleSave} disabled={isSaving || isComplete || isPaused} data-testid="button-save-draft">
+              {isSaving ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="mr-2 h-4 w-4" /> Save Draft</>
+              )}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -226,6 +324,25 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
         <div className="p-3 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-sm" data-testid="text-editor-error">
           {error}
         </div>
+      )}
+
+      {isPaused && artifact?.pauseReason && (
+        <Card className="border-blue-500/50 bg-blue-500/5">
+          <CardContent className="pt-4">
+            <div className="flex items-start gap-3">
+              <Pause className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-medium text-blue-700 dark:text-blue-300">Paused</p>
+                <p className="text-sm text-muted-foreground" data-testid="text-pause-reason">{artifact.pauseReason}</p>
+                {artifact.pausedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Paused on {new Date(artifact.pausedAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-6">
@@ -237,14 +354,14 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
               placeholder="Enter artifact title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={isComplete}
+              disabled={isComplete || isPaused}
               data-testid="input-title"
             />
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="type">Type</Label>
-            <Select value={type} onValueChange={(v) => setType(v as ArtifactType)} disabled={isComplete}>
+            <Select value={type} onValueChange={(v) => setType(v as ArtifactType)} disabled={isComplete || isPaused}>
               <SelectTrigger id="type" data-testid="select-type">
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -281,7 +398,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
             id="scope-expansion"
             checked={isScopeExpansion}
             onCheckedChange={setIsScopeExpansion}
-            disabled={isComplete}
+            disabled={isComplete || isPaused}
             data-testid="switch-scope-expansion"
           />
         </div>
@@ -296,7 +413,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
               <Select 
                 value={structure.audience} 
                 onValueChange={(v) => setStructure({ ...structure, audience: v as "internal" | "external" | "unknown" })}
-                disabled={isComplete}
+                disabled={isComplete || isPaused}
               >
                 <SelectTrigger id="audience" data-testid="select-audience">
                   <SelectValue />
@@ -318,7 +435,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
                     onCheckedChange={(checked) => 
                       setStructure({ ...structure, [key]: checked === true })
                     }
-                    disabled={isComplete}
+                    disabled={isComplete || isPaused}
                     data-testid={`checkbox-${key}`}
                   />
                   <Label htmlFor={key} className="text-sm font-normal cursor-pointer">
@@ -342,7 +459,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
                 placeholder="What must be true for this to be done?"
                 value={doneDefinition}
                 onChange={(e) => setDoneDefinition(e.target.value)}
-                disabled={isComplete}
+                disabled={isComplete || isPaused}
                 data-testid="input-done-definition"
               />
             </div>
@@ -355,7 +472,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
                 value={checksText}
                 onChange={(e) => setChecksText(e.target.value)}
                 rows={4}
-                disabled={isComplete}
+                disabled={isComplete || isPaused}
                 data-testid="textarea-checks"
               />
             </div>
@@ -370,7 +487,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={12}
-            disabled={isComplete}
+            disabled={isComplete || isPaused}
             className="font-mono text-sm"
             data-testid="textarea-body"
           />

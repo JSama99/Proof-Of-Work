@@ -28,7 +28,8 @@ import {
   Archive,
   Filter,
   X,
-  AlertTriangle
+  AlertTriangle,
+  Pause
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -77,6 +78,7 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
     if (statusFilter === "draft") f.status = "draft";
     else if (statusFilter === "complete") f.status = "complete";
     else if (statusFilter === "archived") f.status = "archived";
+    else if (statusFilter === "paused") f.status = "paused";
     else if (statusFilter === "all") f.includeArchived = true;
     return f;
   }, [searchQuery, typeFilter, statusFilter]);
@@ -182,6 +184,7 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
                 <SelectItem value="active">Active (Draft + Complete)</SelectItem>
                 <SelectItem value="draft">Drafts only</SelectItem>
                 <SelectItem value="complete">Complete only</SelectItem>
+                <SelectItem value="paused">Paused only</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
                 <SelectItem value="all">All</SelectItem>
               </SelectContent>
@@ -263,13 +266,15 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
                     </h3>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       <Badge 
-                        variant={artifact.status === "complete" ? "default" : artifact.status === "archived" ? "outline" : "secondary"}
-                        className="text-xs"
+                        variant={artifact.status === "complete" ? "default" : artifact.status === "archived" ? "outline" : artifact.status === "paused" ? "outline" : "secondary"}
+                        className={cn("text-xs", artifact.status === "paused" && "text-blue-600 dark:text-blue-400 border-blue-500/50")}
                       >
                         {artifact.status === "complete" ? (
                           <><CheckCircle2 className="h-3 w-3 mr-1" /> Complete</>
                         ) : artifact.status === "archived" ? (
                           <><Archive className="h-3 w-3 mr-1" /> Archived</>
+                        ) : artifact.status === "paused" ? (
+                          <><Pause className="h-3 w-3 mr-1" /> Paused</>
                         ) : (
                           <><Clock className="h-3 w-3 mr-1" /> Draft</>
                         )}
