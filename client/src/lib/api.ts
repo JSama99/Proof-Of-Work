@@ -87,6 +87,7 @@ export async function createArtifact(input: {
   body: string;
   structure?: Partial<ArtifactStructure>;
   finishCriteria?: FinishCriteria;
+  isScopeExpansion?: boolean;
 }): Promise<{ artifact: ArtifactRecord }> {
   return http<{ artifact: ArtifactRecord }>("/api/artifacts", {
     method: "POST",
@@ -108,6 +109,7 @@ export async function updateArtifact(id: string, input: Partial<{
   body: string;
   structure: Partial<ArtifactStructure>;
   finishCriteria: FinishCriteria;
+  isScopeExpansion: boolean;
 }>): Promise<{ artifact: ArtifactRecord }> {
   return http<{ artifact: ArtifactRecord }>(`/api/artifacts/${id}`, {
     method: "PATCH",

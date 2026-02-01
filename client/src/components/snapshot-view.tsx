@@ -21,7 +21,8 @@ import {
   ListChecks,
   Download,
   Archive,
-  ArchiveRestore
+  ArchiveRestore,
+  AlertTriangle
 } from "lucide-react";
 import { format } from "date-fns";
 import { RTVStatus } from "./complete-artifact";
@@ -93,7 +94,8 @@ export function SnapshotView({ artifact, snapshot, rtv, onRevise, onArchiveChang
     const markdown = `# ${artifact.title}
 
 **Type:** ${artifact.type}
-**Status:** ${artifact.status}
+**Status:** ${artifact.status}${artifact.isScopeExpansion ? `
+**Scope:** Expansion (outside original cycle goal)` : ""}
 ${artifact.completedAt ? `**Completed:** ${format(new Date(artifact.completedAt), "MMMM d, yyyy 'at' h:mm a")}` : ""}
 
 ---
@@ -137,6 +139,12 @@ ${displayBody}
             <Badge variant="outline" className="text-xs">
               {artifact.type}
             </Badge>
+            {artifact.isScopeExpansion && (
+              <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-500/50">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Scope Expansion
+              </Badge>
+            )}
           </div>
           <h2 className="text-2xl font-bold" data-testid="text-snapshot-title">{artifact.title}</h2>
           <div className="flex items-center gap-4 text-sm text-muted-foreground">

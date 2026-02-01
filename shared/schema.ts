@@ -58,6 +58,7 @@ export const artifacts = pgTable("artifacts", {
   structure: jsonb("structure").notNull(),
   body: text("body").notNull().default(""),
   status: varchar("status", { length: 20 }).notNull().default("draft"),
+  isScopeExpansion: boolean("is_scope_expansion").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
@@ -80,6 +81,7 @@ export const artifactSnapshots = pgTable("artifact_snapshots", {
   body: text("body").notNull(),
   finishCriteria: jsonb("finish_criteria"),
   finishSummary: text("finish_summary"),
+  isScopeExpansion: boolean("is_scope_expansion").notNull().default(false),
 });
 
 export const proofUnits = pgTable("proof_units", {
@@ -137,6 +139,7 @@ export interface ArtifactRecord {
   structure: ArtifactStructure;
   body: string;
   status: ArtifactStatus;
+  isScopeExpansion: boolean;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -158,6 +161,7 @@ export interface ArtifactSnapshotRecord {
   body: string;
   finishCriteria?: FinishCriteria;
   finishSummary?: string;
+  isScopeExpansion: boolean;
 }
 
 export interface ProofUnitRecord {

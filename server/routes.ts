@@ -61,6 +61,7 @@ export async function registerRoutes(
         body: z.string().max(100000).default(""),
         structure: artifactStructureSchema.partial().optional(),
         finishCriteria: finishCriteriaSchema.optional(),
+        isScopeExpansion: z.boolean().optional(),
       });
       
       const parsed = schema.safeParse(req.body);
@@ -107,6 +108,7 @@ export async function registerRoutes(
         body: z.string().max(100000).optional(),
         structure: artifactStructureSchema.partial().optional(),
         finishCriteria: finishCriteriaSchema.optional(),
+        isScopeExpansion: z.boolean().optional(),
       });
       
       const parsed = schema.safeParse(req.body);

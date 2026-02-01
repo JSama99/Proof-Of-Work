@@ -27,7 +27,8 @@ import {
   Search,
   Archive,
   Filter,
-  X
+  X,
+  AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -273,6 +274,12 @@ export function ArtifactList({ selectedId, onSelect, refreshSignal, onCreateNew 
                           <><Clock className="h-3 w-3 mr-1" /> Draft</>
                         )}
                       </Badge>
+                      {artifact.isScopeExpansion && (
+                        <Badge variant="outline" className="text-xs text-amber-600 dark:text-amber-400 border-amber-500/50">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Scope
+                        </Badge>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {format(new Date(artifact.createdAt), "MMM d, yyyy")}
                       </span>

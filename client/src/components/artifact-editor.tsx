@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Plus, FileText, CheckCircle2 } from "lucide-react";
+import { Loader2, Save, Plus, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ARTIFACT_TYPES: ArtifactType[] = [
@@ -49,6 +50,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
   const [type, setType] = useState<ArtifactType>("note");
   const [body, setBody] = useState("");
   const [structure, setStructure] = useState<ArtifactStructure>(DEFAULT_STRUCTURE);
+  const [isScopeExpansion, setIsScopeExpansion] = useState(false);
 
   const [doneDefinition, setDoneDefinition] = useState("");
   const [checksText, setChecksText] = useState("");
@@ -77,6 +79,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
         setType(art.type);
         setBody(snap?.body ?? art.body ?? "");
         setStructure(art.structure);
+        setIsScopeExpansion(art.isScopeExpansion);
         setDoneDefinition(snap?.finishCriteria?.doneDefinition ?? art.finishCriteria?.doneDefinition ?? "");
         setChecksText((snap?.finishCriteria?.checks ?? art.finishCriteria?.checks ?? []).join("\n"));
       } else {
@@ -86,6 +89,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
         setType(art.type);
         setBody(rr.body ?? art.body ?? "");
         setStructure(art.structure);
+        setIsScopeExpansion(art.isScopeExpansion);
         setDoneDefinition(art.finishCriteria?.doneDefinition ?? "");
         setChecksText((art.finishCriteria?.checks ?? []).join("\n"));
       }
@@ -105,6 +109,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
       setType("note");
       setBody("");
       setStructure(DEFAULT_STRUCTURE);
+      setIsScopeExpansion(false);
       setDoneDefinition("");
       setChecksText("");
       setError(null);
@@ -123,6 +128,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
         body,
         structure,
         finishCriteria,
+        isScopeExpansion,
       });
       onCreated(result.artifact.id);
       refreshList();
@@ -145,6 +151,7 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
         body,
         structure,
         finishCriteria,
+        isScopeExpansion,
       });
       refreshList();
     } catch (e: unknown) {
@@ -250,6 +257,33 @@ export function ArtifactEditor({ artifactId, onCreated, refreshList }: ArtifactE
               </SelectContent>
             </Select>
           </div>
+        </div>
+
+        <div className={cn(
+          "flex items-center justify-between p-3 rounded-lg border",
+          isScopeExpansion ? "border-amber-500/50 bg-amber-500/5" : "border-border"
+        )}>
+          <div className="flex items-center gap-3">
+            <AlertTriangle className={cn(
+              "h-4 w-4",
+              isScopeExpansion ? "text-amber-500" : "text-muted-foreground"
+            )} />
+            <div className="space-y-0.5">
+              <Label htmlFor="scope-expansion" className="text-sm font-medium cursor-pointer">
+                Scope Expansion
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Is this outside your original cycle goal?
+              </p>
+            </div>
+          </div>
+          <Switch
+            id="scope-expansion"
+            checked={isScopeExpansion}
+            onCheckedChange={setIsScopeExpansion}
+            disabled={isComplete}
+            data-testid="switch-scope-expansion"
+          />
         </div>
 
         <Card>

@@ -34,6 +34,7 @@ function toArtifactRecord(a: Artifact): ArtifactRecord {
     structure: a.structure as ArtifactStructure,
     body: a.body,
     status: a.status as "draft" | "complete" | "archived",
+    isScopeExpansion: a.isScopeExpansion,
     createdAt: a.createdAt.toISOString(),
     updatedAt: a.updatedAt.toISOString(),
     completedAt: a.completedAt?.toISOString(),
@@ -68,6 +69,7 @@ function toSnapshotRecord(s: ArtifactSnapshot): ArtifactSnapshotRecord {
     body: s.body,
     finishCriteria: s.finishCriteria as FinishCriteria | undefined,
     finishSummary: s.finishSummary ?? undefined,
+    isScopeExpansion: s.isScopeExpansion,
   };
 }
 
@@ -99,6 +101,7 @@ export interface IStorage {
     body: string;
     structure?: Partial<ArtifactStructure>;
     finishCriteria?: FinishCriteria;
+    isScopeExpansion?: boolean;
   }): Promise<ArtifactRecord>;
   updateArtifact(userId: string, id: string, input: Partial<{
     title: string;
@@ -106,6 +109,7 @@ export interface IStorage {
     body: string;
     structure: Partial<ArtifactStructure>;
     finishCriteria: FinishCriteria;
+    isScopeExpansion: boolean;
   }>): Promise<ArtifactRecord | null>;
   
   listProofUnits(userId: string, artifactId: string): Promise<ProofUnitRecord[]>;
@@ -185,6 +189,7 @@ export class DatabaseStorage implements IStorage {
     body: string;
     structure?: Partial<ArtifactStructure>;
     finishCriteria?: FinishCriteria;
+    isScopeExpansion?: boolean;
   }): Promise<ArtifactRecord> {
     const id = nanoid();
     const now = new Date();
@@ -198,6 +203,7 @@ export class DatabaseStorage implements IStorage {
       body: input.body,
       structure,
       status: "draft",
+      isScopeExpansion: input.isScopeExpansion ?? false,
       finishCriteria: input.finishCriteria ?? null,
       createdAt: now,
       updatedAt: now,
@@ -214,6 +220,7 @@ export class DatabaseStorage implements IStorage {
     body: string;
     structure: Partial<ArtifactStructure>;
     finishCriteria: FinishCriteria;
+    isScopeExpansion: boolean;
   }>): Promise<ArtifactRecord | null> {
     const existing = await this.getArtifact(userId, id);
     if (!existing) return null;
@@ -227,6 +234,7 @@ export class DatabaseStorage implements IStorage {
       updates.structure = { ...existing.structure, ...input.structure };
     }
     if (input.finishCriteria !== undefined) updates.finishCriteria = input.finishCriteria;
+    if (input.isScopeExpansion !== undefined) updates.isScopeExpansion = input.isScopeExpansion;
     
     const result = await db.update(artifacts)
       .set(updates)
@@ -297,6 +305,7 @@ export class DatabaseStorage implements IStorage {
       body: existing.body,
       finishCriteria: existing.finishCriteria ?? null,
       finishSummary,
+      isScopeExpansion: existing.isScopeExpansion,
     });
     
     const result = await db.update(artifacts)
