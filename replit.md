@@ -16,6 +16,7 @@ POW is an artifact tracking application that helps users document their work wit
 - **Archive System**: Archive completed artifacts to hide from default view, restore when needed
 - **Markdown Export**: Export completed artifacts as .md files with metadata
 - **Activity Log**: Track all major actions (created, updated, proof_added, completed, revised, archived, restored)
+- **POW Manual**: In-app documentation explaining the POW philosophy and system (accessible via book icon in header)
 
 ## Tech Stack
 - **Frontend**: React with TypeScript, TailwindCSS, shadcn/ui components
