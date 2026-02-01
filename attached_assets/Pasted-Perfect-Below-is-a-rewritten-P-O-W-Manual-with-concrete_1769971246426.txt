@@ -1,0 +1,500 @@
+Perfect. Below is a **rewritten P.O.W. Manual** with **concrete examples** and **ASCII diagrams**, while preserving the doctrine tone.
+This is still not marketing copy. It’s an **operational manual** someone can actually follow.
+
+---
+
+# **P.O.W. MANUAL**
+
+## *Proof of Work — A System for Defensible Progress*
+
+---
+
+## 1. What P.O.W. Is (and Is Not)
+
+### What it is
+
+P.O.W. is a system for producing **defensible records of work**.
+
+It exists to answer questions like:
+
+* *What exactly did you build?*
+* *When was it finished?*
+* *What proof exists that work occurred?*
+* *What changed between versions?*
+
+If you were asked to justify your labor months later, P.O.W. gives you evidence—not explanations.
+
+---
+
+### What it is not
+
+P.O.W. is **not**:
+
+* a habit tracker
+* a streak app
+* a task manager
+* a motivation engine
+
+If an app exists to make you *feel productive*, P.O.W. is not that app.
+
+P.O.W. exists to make your work **legible and defensible**.
+
+---
+
+## 2. The Core Principle: Friction Creates Authority
+
+Most software removes friction.
+
+P.O.W. adds **intentional friction** because friction forces:
+
+* decisions
+* boundaries
+* accountability
+
+### Example
+
+A notes app lets you write endlessly.
+P.O.W. asks:
+
+> “What are you actually making—and how will you know when it’s done?”
+
+That pause is the point.
+
+### Diagram
+
+```
+LOW FRICTION SYSTEM
+Idea → Write → Keep Editing → Feel Busy
+
+P.O.W. SYSTEM
+Idea → Define Artifact → Prove Action → Freeze → Authority
+```
+
+If progress feels slower, authority is being built.
+
+---
+
+## 3. The Artifact: The Unit of Reality
+
+Everything in P.O.W. is an **Artifact**.
+
+An artifact is:
+
+> A bounded unit of work with a defined purpose and finish condition.
+
+### Examples of artifacts
+
+* SOP: “Client onboarding process”
+* Checklist: “Deployment checklist”
+* Workflow: “Monthly reporting automation”
+* Spec: “API integration requirements”
+* Principles: “Design standards for brand assets”
+
+### What is *not* an artifact
+
+* loose thoughts
+* brainstorming
+* mood notes
+* unbounded journaling
+
+Those can exist—but they don’t carry authority until completed.
+
+---
+
+## 4. Artifact States (This Is Critical)
+
+Every artifact is always in **one state**.
+
+### Draft
+
+* editable
+* provisional
+* unstable
+
+Drafts are allowed to be incomplete and wrong.
+
+### Complete
+
+* frozen
+* immutable
+* auditable
+
+Completed artifacts **cannot be edited**.
+
+### Diagram
+
+```
+[DRAFT] --complete--> [COMPLETE]
+   ↑                      |
+   |------ revise --------|
+```
+
+There is **no arrow backward** from Complete to Draft.
+
+---
+
+## 5. Finish Criteria: Defining “Done”
+
+Before an artifact can be completed, “done” must be explicit.
+
+Finish Criteria include:
+
+1. **Definition of Done**
+2. **Checks** (binary conditions)
+
+### Example
+
+Artifact: *Client Onboarding SOP*
+
+**Definition of Done**
+
+> “This SOP is complete when a new team member can onboard a client without asking questions.”
+
+**Checks**
+
+* Includes step-by-step intake process
+* Defines required documents
+* Notes edge cases (missing info, delays)
+
+If you can’t articulate this, the artifact is not done.
+
+---
+
+## 6. Proof Units: Evidence That Action Occurred
+
+Writing alone is not proof.
+
+Before completion, you must log at least one **Proof Unit**.
+
+A proof unit records:
+
+* **Mode**
+
+  * Operator: you did the work
+  * Steward: you reviewed, approved, or directed
+* **Type**
+
+  * ship
+  * decide
+  * document
+  * automate
+  * review
+
+### Example
+
+You write a workflow and then test it.
+
+Proof Unit:
+
+* Mode: Operator
+* Type: Test / Review
+* Note: “Ran workflow end-to-end with dummy data.”
+
+### Diagram
+
+```
+Artifact Draft
+     |
+     +-- Proof Unit 1 (document)
+     +-- Proof Unit 2 (review)
+     |
+   Completion allowed
+```
+
+Proof units do **not** judge quality.
+They prove that something real happened.
+
+---
+
+## 7. Completion: The Freeze
+
+Completing an artifact is irreversible.
+
+When you complete:
+
+* the draft body is deleted
+* a snapshot is frozen
+* status becomes `complete`
+* an audit event is recorded
+* RTV tags are assigned
+
+### Example
+
+You complete “Client Onboarding SOP.”
+
+What exists afterward:
+
+* Immutable snapshot of the SOP
+* Timestamp of completion
+* Proof units attached
+* Finish summary explaining what changed
+
+### Diagram
+
+```
+[DRAFT BODY]  →  (deleted)
+        |
+   [SNAPSHOT]
+        |
+   [COMPLETE]
+```
+
+If you’re unsure, **do not complete**.
+
+---
+
+## 8. Revision: Improvement Without Erasure
+
+You never edit completed work.
+
+You **revise** it.
+
+Revision:
+
+* creates a new draft
+* copies the snapshot forward
+* links to the previous version
+
+### Example
+
+You improve the SOP six months later.
+
+Result:
+
+* New draft artifact
+* Parent artifact + snapshot recorded
+* Old version remains authoritative for its time
+
+### Diagram
+
+```
+Artifact v1 (Complete)
+        |
+      Revise
+        |
+Artifact v2 (Draft)
+```
+
+This preserves history and prevents retroactive rewriting.
+
+---
+
+## 9. RTV (Revenue Translation View): Mapping, Not Advice
+
+RTV answers one question:
+
+> “What kinds of value *could* this artifact translate into?”
+
+It does **not** tell you:
+
+* what to sell
+* how to price
+* when to monetize
+
+### Example RTV output
+
+```
+RTV STATUS
+Eligible: Yes
+Locked: No
+
+TRANSLATION MAP
+✓ Internal Leverage
+✓ Reusable Knowledge
+✗ Client-Facing Asset
+✗ Automation System
+```
+
+RTV is observational.
+It does not prescribe action.
+
+---
+
+## 10. Authority Over Activity
+
+P.O.W. does not reward:
+
+* streaks
+* daily usage
+* speed
+* volume
+
+It rewards:
+
+* clarity
+* completion
+* proof
+* restraint
+
+### Example
+
+Ten drafts ≠ one completed artifact.
+
+Only frozen work carries authority.
+
+---
+
+## 11. Pauses Are Management, Not Failure
+
+Life interrupts work.
+
+P.O.W. treats undocumented absence as ambiguity—but **documented pause as leadership**.
+
+### Intentional Pause Artifact
+
+> “I am pausing this cycle for 3 days due to caregiving responsibilities.”
+
+This preserves:
+
+* continuity
+* credibility
+* command
+
+### Diagram
+
+```
+WORK → PAUSE (logged) → RESUME
+```
+
+A gap without explanation looks like flakiness.
+A pause with reason looks like management.
+
+---
+
+## 12. Scope and Boundary Defense
+
+Work expands quietly.
+
+P.O.W. helps you **record reality**.
+
+### Scope Creep Flag
+
+When logging an artifact:
+
+* “Is this inside the original cycle goal?”
+
+  * Yes
+  * No → tagged as Scope Expansion
+
+### Example
+
+End of month report:
+
+* 12 core artifacts
+* 7 scope expansions
+
+This is not confrontation.
+It’s evidence.
+
+---
+
+## 13. Psychological Safety vs Professional Legibility
+
+P.O.W. allows:
+
+* private honesty
+* public precision
+
+Your internal notes can include:
+
+* doubts
+* tradeoffs
+* mistakes
+
+Your client export includes:
+
+* decisions
+* deliverables
+* timelines
+* scope markers
+
+This separation protects both truth and authority.
+
+---
+
+## 14. Drift: The Mirror
+
+P.O.W. does not judge alignment.
+It shows it.
+
+### Example
+
+Planned:
+
+* 70% build
+* 30% admin
+
+Logged:
+
+* 20% build
+* 80% admin
+
+No warning.
+No scolding.
+
+Just a mirror.
+
+### Diagram
+
+```
+PLANNED:  ███████░░
+ACTUAL:   ██░░░░░░░
+```
+
+Self-correction belongs to the user.
+
+---
+
+## 15. What Success Looks Like
+
+Success is **not**:
+
+* perfect consistency
+* maximum output
+* constant motion
+
+Success is:
+
+* a small body of frozen, defensible work
+* clear boundaries around labor
+* a record you can stand behind later
+
+If the system feels heavy, it’s doing its job.
+
+---
+
+## 16. The Core Loop (Memorize This)
+
+```
+DEFINE → ACT → PROVE → FREEZE → REVIEW → REVISE
+```
+
+Skip a step, and authority collapses.
+
+---
+
+## Closing Doctrine
+
+P.O.W. exists for people whose labor has been:
+
+* undervalued
+* blurred
+* extracted
+* erased
+
+This system does not promise success.
+
+It promises **defensibility**.
+
+And defensibility is the foundation of leverage.
+
+---
+
+### Next options (your call)
+
+* Compress this into a **10–12 page field manual**
+* Turn diagrams into **visual-only pages**
+* Create a **client-facing companion guide**
+* Convert this into a **Beginner GPT knowledge base**
+
+Tell me which direction to take next.

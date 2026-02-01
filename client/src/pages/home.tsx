@@ -5,6 +5,7 @@ import { ProofUnits } from "@/components/proof-units";
 import { CompleteArtifact, RTVStatus } from "@/components/complete-artifact";
 import { SnapshotView } from "@/components/snapshot-view";
 import { ActivityLog } from "@/components/activity-log";
+import { ManualDialog } from "@/components/manual-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -169,6 +170,7 @@ export default function Home({ onLogout }: HomeProps) {
             <span className="text-sm text-muted-foreground hidden sm:inline" data-testid="text-user-id">
               {userId}
             </span>
+            <ManualDialog />
             <Button 
               variant={showActivityLog ? "secondary" : "ghost"} 
               size="icon" 
