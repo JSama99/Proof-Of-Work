@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { reviseArtifact, archiveArtifact, restoreArtifact } from "@/lib/api";
-import type { ArtifactRecord, ArtifactSnapshotRecord, RTVResponse } from "@shared/schema";
+import { useState, useEffect } from "react";
+import { reviseArtifact, archiveArtifact, restoreArtifact, getSnapshot } from "@/lib/api";
+import type { ArtifactRecord, ArtifactSnapshotRecord, RTVResponse, ArtifactStructure } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,10 +23,72 @@ import {
   Archive,
   ArchiveRestore,
   AlertTriangle,
-  Shield
+  Shield,
+  ArrowRight,
+  TrendingUp
 } from "lucide-react";
 import { format } from "date-fns";
 import { RTVStatus } from "./complete-artifact";
+
+const STRUCTURE_LABELS: Record<keyof ArtifactStructure, string> = {
+  audience: "Audience",
+  includesWhy: "Includes Why",
+  reusable: "Reusable",
+  hasStepsOrProcess: "Has Steps/Process",
+  coordinatesToolsOrAgents: "Coordinates Tools/Agents",
+  expressesValues: "Expresses Values",
+  thinkingOnly: "Thinking Only",
+};
+
+function DriftVisualization({ 
+  current, 
+  parent 
+}: { 
+  current: ArtifactStructure; 
+  parent: ArtifactStructure;
+}) {
+  const changes: { key: keyof ArtifactStructure; from: string | boolean; to: string | boolean }[] = [];
+  
+  for (const key of Object.keys(current) as (keyof ArtifactStructure)[]) {
+    if (current[key] !== parent[key]) {
+      changes.push({ key, from: parent[key], to: current[key] });
+    }
+  }
+  
+  if (changes.length === 0) {
+    return (
+      <div className="text-sm text-muted-foreground italic">
+        No structural changes from parent revision
+      </div>
+    );
+  }
+  
+  return (
+    <div className="space-y-2" data-testid="drift-visualization">
+      <div className="text-sm text-muted-foreground mb-2">
+        {changes.length} structural {changes.length === 1 ? "change" : "changes"} from parent:
+      </div>
+      {changes.map(({ key, from, to }) => (
+        <div key={key} className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2 flex-wrap">
+          <span className="font-medium min-w-32">{STRUCTURE_LABELS[key]}:</span>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">was</span>
+            <Badge variant="outline" className="bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+              {typeof from === "boolean" ? (from ? "Yes" : "No") : from}
+            </Badge>
+          </div>
+          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">now</span>
+            <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+              {typeof to === "boolean" ? (to ? "Yes" : "No") : to}
+            </Badge>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface SnapshotViewProps {
   artifact: ArtifactRecord;
@@ -42,6 +104,27 @@ export function SnapshotView({ artifact, snapshot, rtv, onRevise, onArchiveChang
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [parentSnapshot, setParentSnapshot] = useState<ArtifactSnapshotRecord | null>(null);
+  const [isLoadingParent, setIsLoadingParent] = useState(false);
+
+  useEffect(() => {
+    async function fetchParentSnapshot() {
+      if (artifact.parentArtifactId && artifact.parentSnapshotId) {
+        setIsLoadingParent(true);
+        try {
+          const result = await getSnapshot(artifact.parentArtifactId, artifact.parentSnapshotId);
+          setParentSnapshot(result.snapshot);
+        } catch (e) {
+          console.error("Failed to fetch parent snapshot:", e);
+        } finally {
+          setIsLoadingParent(false);
+        }
+      } else {
+        setParentSnapshot(null);
+      }
+    }
+    fetchParentSnapshot();
+  }, [artifact.parentArtifactId, artifact.parentSnapshotId]);
 
   async function handleRevise() {
     setError(null);
@@ -285,10 +368,35 @@ ${displayBody}
       </div>
 
       {artifact.parentArtifactId && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FileText className="h-4 w-4" />
-          <span>Revised from artifact: {artifact.parentArtifactId}</span>
-        </div>
+        <Card className="border-blue-500/20 bg-blue-500/5" data-testid="card-revision-info">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+              Revision Drift
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+              <FileText className="h-4 w-4" />
+              <span>Revised from artifact: {artifact.parentArtifactId}</span>
+            </div>
+            {isLoadingParent ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading parent for comparison...
+              </div>
+            ) : parentSnapshot ? (
+              <DriftVisualization 
+                current={snapshot?.structure ?? artifact.structure} 
+                parent={parentSnapshot.structure} 
+              />
+            ) : (
+              <div className="text-sm text-muted-foreground italic">
+                Parent snapshot not available for comparison
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-6 lg:grid-cols-3">
