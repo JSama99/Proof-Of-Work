@@ -22,7 +22,8 @@ import {
   Download,
   Archive,
   ArchiveRestore,
-  AlertTriangle
+  AlertTriangle,
+  Shield
 } from "lucide-react";
 import { format } from "date-fns";
 import { RTVStatus } from "./complete-artifact";
@@ -116,6 +117,73 @@ ${displayBody}
     URL.revokeObjectURL(url);
   }
 
+  async function handleBlackBoxExport() {
+    const displayBody = snapshot?.body ?? artifact.body ?? "";
+    const displayFinishSummary = snapshot?.finishSummary ?? artifact.finishSummary;
+    const displayFinishCriteria = snapshot?.finishCriteria ?? artifact.finishCriteria;
+    const displayStructure = snapshot?.structure ?? artifact.structure;
+    
+    const sealedDocument = {
+      _format: "POW_BLACK_BOX_v1",
+      _exportedAt: new Date().toISOString(),
+      artifact: {
+        id: artifact.id,
+        title: artifact.title,
+        type: artifact.type,
+        status: artifact.status,
+        isScopeExpansion: artifact.isScopeExpansion,
+        structure: displayStructure,
+        createdAt: artifact.createdAt,
+        updatedAt: artifact.updatedAt,
+        completedAt: artifact.completedAt,
+        parentArtifactId: artifact.parentArtifactId,
+        parentSnapshotId: artifact.parentSnapshotId,
+      },
+      content: {
+        body: displayBody,
+        finishCriteria: displayFinishCriteria,
+        finishSummary: displayFinishSummary,
+        rtvTags: snapshot?.rtvTags || artifact.rtvTags,
+      },
+      snapshot: snapshot ? {
+        id: snapshot.id,
+        snapshotVersion: snapshot.snapshotVersion,
+        createdAt: snapshot.createdAt,
+      } : null,
+    };
+
+    const contentToHash = JSON.stringify({
+      artifact: sealedDocument.artifact,
+      content: sealedDocument.content,
+      snapshot: sealedDocument.snapshot,
+    });
+    
+    const encoder = new TextEncoder();
+    const data = encoder.encode(contentToHash);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+    
+    const finalDocument = {
+      ...sealedDocument,
+      _integrity: {
+        algorithm: "SHA-256",
+        hash: hashHex,
+      },
+    };
+
+    const jsonString = JSON.stringify(finalDocument, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${artifact.title.replace(/[^a-zA-Z0-9]/g, "_")}_sealed.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const displayBody = snapshot?.body ?? artifact.body ?? "";
   const displayFinishCriteria = snapshot?.finishCriteria ?? artifact.finishCriteria;
   const displayFinishSummary = snapshot?.finishSummary ?? artifact.finishSummary;
@@ -163,6 +231,14 @@ ${displayBody}
           >
             <Download className="mr-2 h-4 w-4" />
             Export
+          </Button>
+          <Button 
+            onClick={handleBlackBoxExport}
+            variant="outline"
+            data-testid="button-blackbox-export"
+          >
+            <Shield className="mr-2 h-4 w-4" />
+            Sealed Export
           </Button>
           
           {artifact.status === "archived" ? (
