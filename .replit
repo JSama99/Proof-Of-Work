@@ -38,3 +38,9 @@ author = "agent"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[userenv]
+
+[userenv.shared]
+TALON_INFRA_ENDPOINT = "https://talon-infrastructure.replit.app/v1/events"
+TALON_INFRA_TERMINAL_ID = "pow-ledger"
