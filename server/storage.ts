@@ -853,6 +853,63 @@ export class DatabaseStorage implements IStorage {
         ...extra,
       },
     });
+
+    forwardToInfrastructure(eventType, artifact.type, artifact.title, extra).catch(() => {});
+  }
+}
+
+const INTENT_MAP: Record<string, string> = {
+  artifact_created: "create",
+  artifact_approved: "approve",
+  artifact_revised: "revise",
+  decision_checkpoint: "decide",
+  scope_change_acknowledged: "scope_change",
+};
+
+async function forwardToInfrastructure(
+  eventType: string,
+  artifactType: string,
+  signal: string,
+  extra?: Record<string, unknown>,
+): Promise<void> {
+  const intentType = INTENT_MAP[eventType];
+  if (!intentType) return;
+
+  const endpoint = process.env.TALON_INFRA_ENDPOINT;
+  const apiKey = process.env.TALON_INFRA_API_KEY;
+  const terminalId = process.env.TALON_INFRA_TERMINAL_ID || "pow-ledger";
+
+  if (!endpoint || !apiKey) return;
+
+  const payload = {
+    event_type: "IntentCaptured",
+    terminal_id: terminalId,
+    metadata: {
+      intent_type: intentType,
+      target_artifact_type: artifactType,
+      signal,
+      constraints: extra || {},
+    },
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      console.error(`[POW→Infra] Forward failed: ${res.status} ${res.statusText}`);
+    }
+  } catch (err) {
+    console.error("[POW→Infra] Forward error:", err);
   }
 }
 

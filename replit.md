@@ -104,6 +104,19 @@ shared/
 ## Environment Variables
 - `DATABASE_URL` - PostgreSQL connection string (auto-configured)
 - `POW_AUTH_SECRET` - Secret for signing auth tokens
+- `TALON_INFRA_API_KEY` - API key for TalonSight infrastructure event forwarding
+- `TALON_INFRA_ENDPOINT` - TalonSight infrastructure events endpoint URL
+- `TALON_INFRA_TERMINAL_ID` - Terminal identifier for POW in the infrastructure (default: "pow-ledger")
+
+## Infrastructure Integration
+POW Ledger forwards proof-worthy events to the TalonSight infrastructure via `POST` to the configured endpoint. Events are sent as `IntentCaptured` payloads with the following mapping:
+- `artifact_created` → `intent_type: "create"`
+- `artifact_approved` → `intent_type: "approve"`
+- `artifact_revised` → `intent_type: "revise"`
+- `decision_checkpoint` → `intent_type: "decide"`
+- `scope_change_acknowledged` → `intent_type: "scope_change"`
+
+Forwarding is fire-and-forget: failures are logged but never block POW operations.
 
 ## Ledger Entry Schema
 ```
