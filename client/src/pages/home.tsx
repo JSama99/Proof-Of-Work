@@ -6,6 +6,7 @@ import { CompleteArtifact, RTVStatus } from "@/components/complete-artifact";
 import { SnapshotView } from "@/components/snapshot-view";
 import { ActivityLog } from "@/components/activity-log";
 import { ManualDialog } from "@/components/manual-dialog";
+import { LedgerDashboard } from "@/components/ledger-dashboard";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +20,8 @@ import {
   CheckCircle2, 
   Sparkles,
   Menu,
-  Activity
+  Activity,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -35,6 +37,7 @@ export default function Home({ onLogout }: HomeProps) {
   const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
+  const [showLedger, setShowLedger] = useState(false);
   
   const [currentArtifact, setCurrentArtifact] = useState<ArtifactRecord | null>(null);
   const [currentSnapshot, setCurrentSnapshot] = useState<ArtifactSnapshotRecord | null>(null);
@@ -171,6 +174,15 @@ export default function Home({ onLogout }: HomeProps) {
               {userId}
             </span>
             <ManualDialog />
+            <Button
+              variant={showLedger ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setShowLedger(!showLedger)}
+              data-testid="button-ledger"
+              title="POW Ledger"
+            >
+              <ScrollText className="h-4 w-4" />
+            </Button>
             <Button 
               variant={showActivityLog ? "secondary" : "ghost"} 
               size="icon" 
@@ -187,94 +199,102 @@ export default function Home({ onLogout }: HomeProps) {
         </header>
 
         <div className="flex-1 overflow-hidden flex">
-          <div className="flex-1 overflow-hidden">
-            {(currentArtifact?.status === "complete" || currentArtifact?.status === "archived") && currentArtifact ? (
-              <ScrollArea className="h-full">
-                <SnapshotView
-                  artifact={currentArtifact}
-                  snapshot={currentSnapshot}
-                  rtv={currentRTV}
-                  onRevise={handleRevise}
-                  onArchiveChange={handleArchiveChange}
-                />
-              </ScrollArea>
-            ) : (
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "edit" | "proof" | "complete")} className="h-full flex flex-col">
-              <div className="border-b px-4">
-                <TabsList className="h-12">
-                  <TabsTrigger value="edit" className="gap-2" data-testid="tab-edit">
-                    <FileEdit className="h-4 w-4" />
-                    <span className="hidden sm:inline">Editor</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="proof" className="gap-2" disabled={!selectedId} data-testid="tab-proof">
-                    <Sparkles className="h-4 w-4" />
-                    <span className="hidden sm:inline">Proof Units</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="complete" className="gap-2" disabled={!selectedId || isComplete} data-testid="tab-complete">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="hidden sm:inline">Complete</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
+          {showLedger ? (
+            <div className="flex-1 overflow-hidden">
+              <LedgerDashboard onBack={() => setShowLedger(false)} />
+            </div>
+          ) : (
+            <>
               <div className="flex-1 overflow-hidden">
-                <TabsContent value="edit" className="h-full m-0 data-[state=active]:flex flex-col">
-                  <ScrollArea className="flex-1">
-                    <ArtifactEditor
-                      artifactId={selectedId}
-                      onCreated={handleCreated}
-                      refreshList={refreshList}
+                {(currentArtifact?.status === "complete" || currentArtifact?.status === "archived") && currentArtifact ? (
+                  <ScrollArea className="h-full">
+                    <SnapshotView
+                      artifact={currentArtifact}
+                      snapshot={currentSnapshot}
+                      rtv={currentRTV}
+                      onRevise={handleRevise}
+                      onArchiveChange={handleArchiveChange}
                     />
                   </ScrollArea>
-                </TabsContent>
-
-                <TabsContent value="proof" className="h-full m-0 data-[state=active]:flex flex-col">
-                  <ScrollArea className="flex-1">
-                    <div className="p-6 max-w-2xl">
-                      <ProofUnits 
-                        artifactId={selectedId} 
-                        onProofAdded={refreshList}
-                      />
+                ) : (
+                  <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "edit" | "proof" | "complete")} className="h-full flex flex-col">
+                    <div className="border-b px-4">
+                      <TabsList className="h-12">
+                        <TabsTrigger value="edit" className="gap-2" data-testid="tab-edit">
+                          <FileEdit className="h-4 w-4" />
+                          <span className="hidden sm:inline">Editor</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="proof" className="gap-2" disabled={!selectedId} data-testid="tab-proof">
+                          <Sparkles className="h-4 w-4" />
+                          <span className="hidden sm:inline">Proof Units</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="complete" className="gap-2" disabled={!selectedId || isComplete} data-testid="tab-complete">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span className="hidden sm:inline">Complete</span>
+                        </TabsTrigger>
+                      </TabsList>
                     </div>
-                  </ScrollArea>
-                </TabsContent>
 
-                <TabsContent value="complete" className="h-full m-0 data-[state=active]:flex flex-col">
-                  <ScrollArea className="flex-1">
-                    <div className="p-6 max-w-2xl space-y-6">
-                      {currentArtifact && (
-                        <>
-                          <div className="space-y-2">
-                            <h3 className="text-lg font-semibold">Complete Artifact</h3>
-                            <p className="text-sm text-muted-foreground">
-                              Mark "{currentArtifact.title}" as complete. This will create an immutable snapshot.
-                            </p>
+                    <div className="flex-1 overflow-hidden">
+                      <TabsContent value="edit" className="h-full m-0 data-[state=active]:flex flex-col">
+                        <ScrollArea className="flex-1">
+                          <ArtifactEditor
+                            artifactId={selectedId}
+                            onCreated={handleCreated}
+                            refreshList={refreshList}
+                          />
+                        </ScrollArea>
+                      </TabsContent>
+
+                      <TabsContent value="proof" className="h-full m-0 data-[state=active]:flex flex-col">
+                        <ScrollArea className="flex-1">
+                          <div className="p-6 max-w-2xl">
+                            <ProofUnits
+                              artifactId={selectedId}
+                              onProofAdded={refreshList}
+                            />
                           </div>
-                          
-                          <Button 
-                            onClick={() => setIsCompleteDialogOpen(true)}
-                            className="w-full"
-                            data-testid="button-open-complete"
-                          >
-                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                            Complete Artifact
-                          </Button>
-                          
-                          <RTVStatus rtv={currentRTV} />
-                        </>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </TabsContent>
-              </div>
-            </Tabs>
-            )}
-          </div>
+                        </ScrollArea>
+                      </TabsContent>
 
-          {showActivityLog && (
-            <div className="hidden lg:block w-80 border-l overflow-hidden">
-              <ActivityLog refreshSignal={refreshSignal} />
-            </div>
+                      <TabsContent value="complete" className="h-full m-0 data-[state=active]:flex flex-col">
+                        <ScrollArea className="flex-1">
+                          <div className="p-6 max-w-2xl space-y-6">
+                            {currentArtifact && (
+                              <>
+                                <div className="space-y-2">
+                                  <h3 className="text-lg font-semibold">Complete Artifact</h3>
+                                  <p className="text-sm text-muted-foreground">
+                                    Mark "{currentArtifact.title}" as complete. This will create an immutable snapshot.
+                                  </p>
+                                </div>
+
+                                <Button
+                                  onClick={() => setIsCompleteDialogOpen(true)}
+                                  className="w-full"
+                                  data-testid="button-open-complete"
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Complete Artifact
+                                </Button>
+
+                                <RTVStatus rtv={currentRTV} />
+                              </>
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </TabsContent>
+                    </div>
+                  </Tabs>
+                )}
+              </div>
+
+              {showActivityLog && (
+                <div className="hidden lg:block w-80 border-l overflow-hidden">
+                  <ActivityLog refreshSignal={refreshSignal} />
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

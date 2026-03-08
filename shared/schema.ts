@@ -217,3 +217,64 @@ export const DEFAULT_STRUCTURE: ArtifactStructure = {
   expressesValues: false,
   thinkingOnly: false,
 };
+
+export const ledgerEventTypeEnum = z.enum([
+  "artifact_created",
+  "artifact_revised",
+  "artifact_approved",
+  "prompt_used",
+  "model_version_recorded",
+  "collaborator_contribution",
+  "ownership_transfer",
+  "export_published",
+  "deliverable_completed",
+  "decision_checkpoint",
+  "scope_change_acknowledged",
+]);
+export type LedgerEventType = z.infer<typeof ledgerEventTypeEnum>;
+
+export const ledgerEntries = pgTable("ledger_entries", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id", { length: 255 }),
+  workspaceId: varchar("workspace_id", { length: 255 }),
+  terminalSource: varchar("terminal_source", { length: 100 }).notNull(),
+  artifactType: varchar("artifact_type", { length: 100 }),
+  artifactId: varchar("artifact_id", { length: 255 }),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  actorId: varchar("actor_id", { length: 255 }).notNull(),
+  parentArtifactId: varchar("parent_artifact_id", { length: 255 }),
+  artifactHash: varchar("artifact_hash", { length: 128 }),
+  modelId: varchar("model_id", { length: 255 }),
+  modelVersion: varchar("model_version", { length: 100 }),
+  permissionScope: varchar("permission_scope", { length: 100 }),
+  signature: text("signature"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLedgerEntrySchema = createInsertSchema(ledgerEntries).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type LedgerEntry = typeof ledgerEntries.$inferSelect;
+export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;
+
+export interface LedgerEntryRecord {
+  id: string;
+  projectId?: string;
+  workspaceId?: string;
+  terminalSource: string;
+  artifactType?: string;
+  artifactId?: string;
+  eventType: LedgerEventType;
+  actorId: string;
+  parentArtifactId?: string;
+  artifactHash?: string;
+  modelId?: string;
+  modelVersion?: string;
+  permissionScope?: string;
+  signature?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}

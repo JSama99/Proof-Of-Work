@@ -9,6 +9,7 @@ import {
   finishCriteriaSchema,
   proofModeEnum,
   proofTypeEnum,
+  ledgerEventTypeEnum,
 } from "@shared/schema";
 
 export async function registerRoutes(
@@ -317,6 +318,97 @@ export async function registerRoutes(
       const cursor = (req.query.cursor as string) || null;
       
       const result = await storage.listActivityEvents(userId, limit, cursor);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.post("/api/ledger/record", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+
+      const schema = z.object({
+        terminalSource: z.string().min(1).max(100),
+        eventType: ledgerEventTypeEnum,
+        artifactId: z.string().max(255).optional(),
+        artifactType: z.string().max(100).optional(),
+        parentArtifactId: z.string().max(255).optional(),
+        projectId: z.string().max(255).optional(),
+        workspaceId: z.string().max(255).optional(),
+        artifactHash: z.string().max(128).optional(),
+        modelId: z.string().max(255).optional(),
+        modelVersion: z.string().max(100).optional(),
+        permissionScope: z.string().max(100).optional(),
+        metadata: z.record(z.unknown()).optional(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues });
+      }
+
+      const entry = await storage.recordLedgerEvent({
+        ...parsed.data,
+        actorId: userId,
+      });
+      res.json({ entry });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.get("/api/ledger/entries", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const limit = Math.min(Math.max(parseInt(req.query.limit as string) || 50, 1), 100);
+      const cursor = (req.query.cursor as string) || null;
+
+      const filters: Record<string, string> = {};
+      if (req.query.projectId) filters.projectId = req.query.projectId as string;
+      if (req.query.terminalSource) filters.terminalSource = req.query.terminalSource as string;
+      if (req.query.artifactId) filters.artifactId = req.query.artifactId as string;
+      if (req.query.eventType) filters.eventType = req.query.eventType as string;
+      filters.actorId = req.query.actorId as string || userId;
+
+      const result = await storage.listLedgerEntries(limit, cursor, filters);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.get("/api/ledger/entries/:id", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const entry = await storage.getLedgerEntry(req.params.id);
+      if (!entry || entry.actorId !== userId) {
+        return res.status(404).json({ error: "Ledger entry not found" });
+      }
+      res.json({ entry });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.get("/api/ledger/lineage/:artifactId", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const entries = await storage.getLedgerLineage(req.params.artifactId);
+      const scoped = entries.filter((e) => e.actorId === userId);
+      res.json({ entries: scoped });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message || "Internal error" });
+    }
+  });
+
+  app.get("/api/ledger/verify/:id", requireUser, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const result = await storage.verifyLedgerEntry(req.params.id);
+      if (!result || result.entry.actorId !== userId) {
+        return res.status(404).json({ error: "Ledger entry not found" });
+      }
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ error: e.message || "Internal error" });

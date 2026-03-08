@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import { createHash } from "crypto";
 import { db } from "./db";
 import { eq, desc, and, lt, sql, ilike, or, ne } from "drizzle-orm";
 import {
@@ -7,19 +8,23 @@ import {
   proofUnits,
   userStates,
   activityEvents,
+  ledgerEntries,
   type Artifact,
   type ArtifactSnapshot,
   type ProofUnit,
   type UserState,
   type ActivityEvent,
+  type LedgerEntry,
   type ArtifactRecord,
   type ArtifactSnapshotRecord,
   type ProofUnitRecord,
   type ActivityEventRecord,
+  type LedgerEntryRecord,
   type ArtifactStructure,
   type FinishCriteria,
   type ArtifactType,
   type ActivityEventType,
+  type LedgerEventType,
   type RTVTag,
   type RTVResponse,
   DEFAULT_STRUCTURE,
@@ -87,6 +92,47 @@ function toProofUnitRecord(p: ProofUnit): ProofUnitRecord {
   };
 }
 
+function toLedgerEntryRecord(e: LedgerEntry): LedgerEntryRecord {
+  return {
+    id: e.id,
+    projectId: e.projectId ?? undefined,
+    workspaceId: e.workspaceId ?? undefined,
+    terminalSource: e.terminalSource,
+    artifactType: e.artifactType ?? undefined,
+    artifactId: e.artifactId ?? undefined,
+    eventType: e.eventType as LedgerEventType,
+    actorId: e.actorId,
+    parentArtifactId: e.parentArtifactId ?? undefined,
+    artifactHash: e.artifactHash ?? undefined,
+    modelId: e.modelId ?? undefined,
+    modelVersion: e.modelVersion ?? undefined,
+    permissionScope: e.permissionScope ?? undefined,
+    signature: e.signature ?? undefined,
+    metadata: e.metadata as Record<string, unknown> | undefined,
+    createdAt: e.createdAt.toISOString(),
+  };
+}
+
+function stableStringify(obj: unknown): string {
+  if (obj === null || obj === undefined) return "null";
+  if (typeof obj !== "object") return JSON.stringify(obj);
+  if (Array.isArray(obj)) return "[" + obj.map(stableStringify).join(",") + "]";
+  const sorted = Object.keys(obj as Record<string, unknown>).sort();
+  return "{" + sorted.map((k) => JSON.stringify(k) + ":" + stableStringify((obj as Record<string, unknown>)[k])).join(",") + "}";
+}
+
+function computeArtifactHash(data: Record<string, unknown>): string {
+  return createHash("sha256").update(stableStringify(data)).digest("hex");
+}
+
+export interface ListLedgerFilters {
+  projectId?: string;
+  terminalSource?: string;
+  artifactId?: string;
+  eventType?: string;
+  actorId?: string;
+}
+
 export interface ListArtifactsFilters {
   search?: string;
   type?: ArtifactType;
@@ -140,6 +186,27 @@ export interface IStorage {
   
   listActivityEvents(userId: string, limit: number, cursor: string | null): Promise<{ events: ActivityEventRecord[]; nextCursor: string | null }>;
   logActivityEvent(userId: string, eventType: ActivityEventType, artifactId?: string, metadata?: Record<string, any>): Promise<void>;
+
+  recordLedgerEvent(input: {
+    terminalSource: string;
+    eventType: string;
+    actorId: string;
+    artifactId?: string;
+    artifactType?: string;
+    parentArtifactId?: string;
+    projectId?: string;
+    workspaceId?: string;
+    artifactHash?: string;
+    modelId?: string;
+    modelVersion?: string;
+    permissionScope?: string;
+    signature?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<LedgerEntryRecord>;
+  getLedgerEntry(entryId: string): Promise<LedgerEntryRecord | null>;
+  listLedgerEntries(limit: number, cursor: string | null, filters?: ListLedgerFilters): Promise<{ entries: LedgerEntryRecord[]; nextCursor: string | null }>;
+  getLedgerLineage(artifactId: string): Promise<LedgerEntryRecord[]>;
+  verifyLedgerEntry(entryId: string): Promise<{ entry: LedgerEntryRecord; computedHash: string; valid: boolean } | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -215,7 +282,10 @@ export class DatabaseStorage implements IStorage {
     
     await this.logActivityEvent(userId, "created", id, { artifactTitle: input.title });
     
-    return toArtifactRecord(result[0]);
+    const record = toArtifactRecord(result[0]);
+    await this.emitLedgerFromAction(userId, "artifact_created", record);
+    
+    return record;
   }
 
   async updateArtifact(userId: string, id: string, input: Partial<{
@@ -281,6 +351,12 @@ export class DatabaseStorage implements IStorage {
       proofMode: input.mode,
       proofType: input.proofType,
     });
+
+    await this.emitLedgerFromAction(userId, "decision_checkpoint", artifact, {
+      proofMode: input.mode,
+      proofType: input.proofType,
+      proofNote: input.note,
+    });
     
     return toProofUnitRecord(result[0]);
   }
@@ -327,7 +403,12 @@ export class DatabaseStorage implements IStorage {
     await this.updateUserState(userId, { completedArtifact: true });
     await this.logActivityEvent(userId, "completed", id, { artifactTitle: existing.title });
     
-    return result[0] ? { artifact: toArtifactRecord(result[0]), snapshotId } : null;
+    if (result[0]) {
+      const record = toArtifactRecord(result[0]);
+      await this.emitLedgerFromAction(userId, "artifact_approved", record, { snapshotId });
+      return { artifact: record, snapshotId };
+    }
+    return null;
   }
 
   async reviseArtifact(userId: string, id: string, newTitle?: string): Promise<ArtifactRecord | null> {
@@ -366,7 +447,12 @@ export class DatabaseStorage implements IStorage {
       oldStatus: existing.status,
     });
     
-    return result[0] ? toArtifactRecord(result[0]) : null;
+    if (result[0]) {
+      const record = toArtifactRecord(result[0]);
+      await this.emitLedgerFromAction(userId, "artifact_revised", record, { parentArtifactId: id });
+      return record;
+    }
+    return null;
   }
 
   async getSnapshot(userId: string, artifactId: string, snapshotId: string): Promise<ArtifactSnapshotRecord | null> {
@@ -519,9 +605,12 @@ export class DatabaseStorage implements IStorage {
     
     if (result[0]) {
       await this.logActivityEvent(userId, "archived", id, { artifactTitle: existing.title });
+      const record = toArtifactRecord(result[0]);
+      await this.emitLedgerFromAction(userId, "scope_change_acknowledged", record, { action: "archived" });
+      return record;
     }
     
-    return result[0] ? toArtifactRecord(result[0]) : null;
+    return null;
   }
 
   async restoreArtifact(userId: string, id: string): Promise<ArtifactRecord | null> {
@@ -615,6 +704,154 @@ export class DatabaseStorage implements IStorage {
       artifactId: artifactId ?? null,
       eventType,
       metadata: metadata ?? null,
+    });
+  }
+
+  async recordLedgerEvent(input: {
+    terminalSource: string;
+    eventType: string;
+    actorId: string;
+    artifactId?: string;
+    artifactType?: string;
+    parentArtifactId?: string;
+    projectId?: string;
+    workspaceId?: string;
+    artifactHash?: string;
+    modelId?: string;
+    modelVersion?: string;
+    permissionScope?: string;
+    signature?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<LedgerEntryRecord> {
+    const id = nanoid();
+
+    const hashPayload: Record<string, unknown> = {
+      terminalSource: input.terminalSource,
+      eventType: input.eventType,
+      actorId: input.actorId,
+      artifactId: input.artifactId,
+      artifactType: input.artifactType,
+      parentArtifactId: input.parentArtifactId,
+      artifactHash: input.artifactHash,
+      metadata: input.metadata,
+    };
+    const entryHash = computeArtifactHash(hashPayload);
+
+    const result = await db.insert(ledgerEntries).values({
+      id,
+      projectId: input.projectId ?? null,
+      workspaceId: input.workspaceId ?? null,
+      terminalSource: input.terminalSource,
+      artifactType: input.artifactType ?? null,
+      artifactId: input.artifactId ?? null,
+      eventType: input.eventType,
+      actorId: input.actorId,
+      parentArtifactId: input.parentArtifactId ?? null,
+      artifactHash: input.artifactHash ?? null,
+      modelId: input.modelId ?? null,
+      modelVersion: input.modelVersion ?? null,
+      permissionScope: input.permissionScope ?? null,
+      signature: entryHash,
+      metadata: input.metadata ?? null,
+    }).returning();
+
+    return toLedgerEntryRecord(result[0]);
+  }
+
+  async getLedgerEntry(entryId: string): Promise<LedgerEntryRecord | null> {
+    const result = await db.select().from(ledgerEntries)
+      .where(eq(ledgerEntries.id, entryId))
+      .limit(1);
+    return result[0] ? toLedgerEntryRecord(result[0]) : null;
+  }
+
+  async listLedgerEntries(limit: number, cursor: string | null, filters?: ListLedgerFilters): Promise<{ entries: LedgerEntryRecord[]; nextCursor: string | null }> {
+    const conditions: any[] = [];
+
+    if (filters?.projectId) conditions.push(eq(ledgerEntries.projectId, filters.projectId));
+    if (filters?.terminalSource) conditions.push(eq(ledgerEntries.terminalSource, filters.terminalSource));
+    if (filters?.artifactId) conditions.push(eq(ledgerEntries.artifactId, filters.artifactId));
+    if (filters?.eventType) conditions.push(eq(ledgerEntries.eventType, filters.eventType));
+    if (filters?.actorId) conditions.push(eq(ledgerEntries.actorId, filters.actorId));
+    if (cursor) conditions.push(lt(ledgerEntries.createdAt, new Date(cursor)));
+
+    const query = conditions.length > 0
+      ? db.select().from(ledgerEntries).where(and(...conditions))
+      : db.select().from(ledgerEntries);
+
+    const results = await query
+      .orderBy(desc(ledgerEntries.createdAt))
+      .limit(limit + 1);
+
+    const hasMore = results.length > limit;
+    const items = hasMore ? results.slice(0, limit) : results;
+    const nextCursor = hasMore && items.length > 0 ? items[items.length - 1].createdAt.toISOString() : null;
+
+    return {
+      entries: items.map(toLedgerEntryRecord),
+      nextCursor,
+    };
+  }
+
+  async getLedgerLineage(artifactId: string): Promise<LedgerEntryRecord[]> {
+    const results = await db.select().from(ledgerEntries)
+      .where(or(
+        eq(ledgerEntries.artifactId, artifactId),
+        eq(ledgerEntries.parentArtifactId, artifactId)
+      ))
+      .orderBy(ledgerEntries.createdAt);
+
+    return results.map(toLedgerEntryRecord);
+  }
+
+  async verifyLedgerEntry(entryId: string): Promise<{ entry: LedgerEntryRecord; computedHash: string; valid: boolean } | null> {
+    const result = await db.select().from(ledgerEntries)
+      .where(eq(ledgerEntries.id, entryId))
+      .limit(1);
+
+    if (!result[0]) return null;
+
+    const entry = result[0];
+    const hashPayload: Record<string, unknown> = {
+      terminalSource: entry.terminalSource,
+      eventType: entry.eventType,
+      actorId: entry.actorId,
+      artifactId: entry.artifactId,
+      artifactType: entry.artifactType,
+      parentArtifactId: entry.parentArtifactId,
+      artifactHash: entry.artifactHash,
+      metadata: entry.metadata,
+    };
+    const computedHash = computeArtifactHash(hashPayload);
+    const valid = computedHash === entry.signature;
+
+    return {
+      entry: toLedgerEntryRecord(entry),
+      computedHash,
+      valid,
+    };
+  }
+
+  async emitLedgerFromAction(actorId: string, eventType: string, artifact: ArtifactRecord, extra?: Record<string, unknown>): Promise<void> {
+    const hash = computeArtifactHash({
+      title: artifact.title,
+      type: artifact.type,
+      body: artifact.body,
+      structure: artifact.structure,
+    });
+
+    await this.recordLedgerEvent({
+      terminalSource: "POW",
+      eventType,
+      actorId,
+      artifactId: artifact.id,
+      artifactType: artifact.type,
+      parentArtifactId: artifact.parentArtifactId,
+      artifactHash: hash,
+      metadata: {
+        artifactTitle: artifact.title,
+        ...extra,
+      },
     });
   }
 }

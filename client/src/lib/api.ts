@@ -3,6 +3,7 @@ import type {
   ArtifactSnapshotRecord,
   ProofUnitRecord,
   ActivityEventRecord,
+  LedgerEntryRecord,
   ArtifactType,
   FinishCriteria,
   ArtifactStructure,
@@ -186,4 +187,40 @@ export async function listActivityEvents(
   qs.set("limit", String(limit));
   if (cursor) qs.set("cursor", cursor);
   return http<{ events: ActivityEventRecord[]; nextCursor: string | null }>(`/api/activity?${qs.toString()}`);
+}
+
+export interface ListLedgerFilters {
+  projectId?: string;
+  terminalSource?: string;
+  artifactId?: string;
+  eventType?: string;
+  actorId?: string;
+}
+
+export async function listLedgerEntries(
+  limit = 50,
+  cursor: string | null = null,
+  filters?: ListLedgerFilters
+): Promise<{ entries: LedgerEntryRecord[]; nextCursor: string | null }> {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (cursor) qs.set("cursor", cursor);
+  if (filters?.projectId) qs.set("projectId", filters.projectId);
+  if (filters?.terminalSource) qs.set("terminalSource", filters.terminalSource);
+  if (filters?.artifactId) qs.set("artifactId", filters.artifactId);
+  if (filters?.eventType) qs.set("eventType", filters.eventType);
+  if (filters?.actorId) qs.set("actorId", filters.actorId);
+  return http<{ entries: LedgerEntryRecord[]; nextCursor: string | null }>(`/api/ledger/entries?${qs.toString()}`);
+}
+
+export async function getLedgerEntry(id: string): Promise<{ entry: LedgerEntryRecord }> {
+  return http<{ entry: LedgerEntryRecord }>(`/api/ledger/entries/${id}`);
+}
+
+export async function getLedgerLineage(artifactId: string): Promise<{ entries: LedgerEntryRecord[] }> {
+  return http<{ entries: LedgerEntryRecord[] }>(`/api/ledger/lineage/${artifactId}`);
+}
+
+export async function verifyLedgerEntry(id: string): Promise<{ entry: LedgerEntryRecord; computedHash: string; valid: boolean }> {
+  return http<{ entry: LedgerEntryRecord; computedHash: string; valid: boolean }>(`/api/ledger/verify/${id}`);
 }
