@@ -1,0 +1,277 @@
+POW Ledger fits into the infrastructure as the trust layer, not the product layer.
+
+Your terminals do the work.
+Your infrastructure moves the work.
+POW Ledger proves the work.
+
+That is the cleanest way to think about it.
+
+The role inside TalonSight infrastructure
+
+If TalonSight infrastructure is the operating system, POW Ledger is the part that answers:
+	•	What happened?
+	•	Who did it?
+	•	When did it happen?
+	•	What version was used?
+	•	What came before it?
+	•	Can this be proven later?
+
+So POW Ledger should sit under every terminal, but beside storage, not replacing storage.
+
+Simple placement
+
+[ Terminal Layer ]
+Sonic Genesis | TalonVision | Da Cypher | TalonFly | Decipher | SignGenesis
+
+        ↓ creates / edits / approves
+
+[ Core Infrastructure Layer ]
+Auth
+Projects
+Artifact Store
+Workflow Engine
+Model Orchestrator
+Collaboration
+Permissions
+Exports
+
+        ↓ emits proof-worthy events
+
+[ POW Ledger ]
+Hashes
+Lineage
+Decision records
+Ownership records
+Approval checkpoints
+Publish/export proofs
+
+        ↓ supports
+
+[ Trust / Reliability Layer ]
+Audit trails
+Verification
+Dispute resolution
+Client proof
+Compliance exports
+Royalty / attribution support
+
+What it does in the flow
+
+A terminal should not write directly to the ledger as its main database.
+
+Instead, the flow should be:
+
+1. User acts in a terminal
+2. Infrastructure processes the action
+3. Artifact or decision is stored normally
+4. A proof event is generated
+5. POW Ledger records the proof record
+6. Verification/export systems can later read that record
+
+That means POW Ledger is downstream of the action, but upstream of trust features.
+
+What POW Ledger should record
+
+Not everything. Only things that matter for proof, lineage, and governance.
+
+Examples:
+	•	artifact created
+	•	artifact revised
+	•	artifact approved
+	•	prompt used for generation
+	•	model/version used
+	•	collaborator contribution
+	•	ownership transfer
+	•	export/publish event
+	•	payment-linked deliverable completion
+	•	decision checkpoint
+	•	contract/scope change acknowledgement
+
+Good rule:
+
+Store the artifact in storage. Store the proof in the ledger.
+
+What it should not become
+
+Do not let POW Ledger become:
+	•	the main app database
+	•	the file storage system
+	•	a giant event junk drawer
+	•	a live UX dependency for every screen
+
+If you do that, the whole infrastructure gets heavy and slow.
+
+POW Ledger should be the authoritative proof rail, not the place where normal app reads happen all day.
+
+The best way it fits architecturally
+
+For TalonSight, POW Ledger fits best as a cross-terminal service.
+
+That means:
+	•	every terminal uses the same ledger protocol
+	•	every terminal emits standardized proof events
+	•	the ledger normalizes them into one trust model
+
+So TalonVision and Da Cypher may create different artifact types, but the ledger sees them through a shared structure.
+
+Example normalized record:
+
+ledger_entry
+- entry_id
+- project_id
+- workspace_id
+- terminal_source
+- artifact_type
+- artifact_id
+- event_type
+- actor_id
+- timestamp
+- parent_artifact_id
+- artifact_hash
+- model_id
+- model_version
+- permission_scope
+- signature
+- metadata
+
+That is how it fits the infrastructure cleanly:
+many terminals, one proof language.
+
+Where it plugs into your PCOMJR-style infrastructure
+
+Using your infrastructure logic, POW Ledger belongs closest to these layers:
+
+Pipeline
+
+Receives proof-worthy events from terminal workflows.
+
+Context
+
+Captures the surrounding context of the artifact or decision:
+	•	project
+	•	user
+	•	collaborators
+	•	prompt
+	•	tool state
+	•	permissions
+
+Orchestrator
+
+Knows which actions should create ledger entries.
+
+Model
+
+Records which model or generation path was involved.
+
+Judgment
+
+This is a big one. POW Ledger should record:
+	•	approvals
+	•	rejections
+	•	human overrides
+	•	confidence checkpoints
+	•	policy/governance outcomes
+
+Artifact
+
+Records lineage of the artifact itself.
+
+Reliability
+
+Provides replayability, auditability, and verification.
+
+So POW Ledger is not just attached to Artifact.
+It actually sits across Judgment + Artifact + Reliability.
+
+The strongest infrastructure interpretation
+
+The strongest version of TalonSight is this:
+	•	Infrastructure creates
+	•	Ledger attests
+	•	Exports verify
+
+That gives you something competitors usually do not have:
+not just AI generation, but provable creation history.
+
+That matters for:
+	•	enterprise trust
+	•	creator ownership
+	•	client transparency
+	•	dispute handling
+	•	provenance
+	•	royalty logic
+	•	marketplace credibility
+	•	“TalonSight Verified Export”
+
+Recommended internal position
+
+I’d place POW Ledger as its own infrastructure domain:
+
+TalonSight Infrastructure
+├── Identity & Access
+├── Project / Workspace System
+├── Artifact Graph
+├── Workflow / Orchestration
+├── Model Routing
+├── Collaboration
+├── Monetization / Payments
+├── Export / Publishing
+└── POW Ledger
+    ├── Proof ingestion
+    ├── Hashing
+    ├── Lineage records
+    ├── Decision records
+    ├── Ownership records
+    ├── Verification API
+    └── Audit / export proofs
+
+That makes it a platform service, not a front-end terminal.
+
+How terminals should interact with it
+
+Each terminal should send proof-worthy events through a shared infrastructure API, something like:
+
+recordProofEvent({
+  terminal: "TalonVision",
+  eventType: "artifact_revision",
+  artifactId: "...",
+  parentArtifactId: "...",
+  actorId: "...",
+  hash: "...",
+  metadata: {...}
+})
+
+So the terminal does not need custom ledger logic every time.
+It just uses the infrastructure rail.
+
+That keeps TalonFly, Da Cypher, Sonic Genesis, and TalonVision all consistent.
+
+Why this matters strategically
+
+This is where POW Ledger becomes more than a feature.
+
+It becomes one of TalonSight’s core infrastructure moats:
+	•	Adobe can help make things
+	•	Runway can help generate things
+	•	many tools can export files
+
+But TalonSight can aim to prove:
+	•	origin
+	•	authorship
+	•	decision trail
+	•	contribution chain
+	•	verified export history
+
+That is much stronger than “AI tool.”
+That is creative trust infrastructure.
+
+Final answer
+
+POW Ledger fits the infrastructure as a shared proof and lineage service that sits beneath all terminals and records proof-worthy actions across artifact creation, revision, decisions, approvals, and ownership.
+
+In one sentence:
+
+The terminals create value, the infrastructure manages value, and POW Ledger proves value.
+
+The next design question you should lock is:
+what exact events are “ledger-worthy” versus normal app events, because that boundary determines whether the system stays clean or turns into bloat.
