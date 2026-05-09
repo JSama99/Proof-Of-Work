@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "5VqaJ2ocmUC_unIes154e"
+uri = "file://pow-ledger-export.tar.gz"
+type = "unspecified"
+title = "POW Ledger — Source Export (147 KB)"
