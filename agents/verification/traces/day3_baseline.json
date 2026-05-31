@@ -1,0 +1,131 @@
+[
+  {
+    "model_version": "gemini-2.5-flash",
+    "content": {
+      "parts": [
+        {
+          "function_call": {
+            "id": "adk-92e9b7f4-66f9-4601-84ab-29c17c6a001e",
+            "args": {},
+            "name": "list_artifacts"
+          },
+          "thought_signature": "Cv8CAY89a19uB8Zg0JGk9xDYzrOZfLA036w4MRk3FVht9LOVEpIUkGlF4JCNRpziRPJWBpEWrfj4W0R8X1jPOY3-ECGNc2-uMetOW355fHKCX_Vf6tC6yKwPRvCoOQ_In5dYi0ByfwRp-7opQ0ef8fY8d_SN0gkoyDoegLKQ6SgUUBPaUMhOXLG4jdQMYW_6-AV5lhRhMZO5YsUyvMhn_4cFIY4HcOZlANAAduUOeLvmC9l95VlKMyaAlK6IMfzK1SFqyUX1R86_xuRDKYoJiIbwe-KN9xclUL8kIzOJlb__t7E6lyNumrjx3yxBEkwLzaHHBG9iJ8MzhcJV6c6UHgbAwwjgMAxkOA446OgVcAnhP0LEaw7kDf-_bTKJPOA_zBTd8rhB3Zvdn44au3oM7w6WqTZO_1v43GgTZuaS3GQrVS2xS4z57EPH5kVySouxE2Jv77lEP15wtVWwHjK_EtbFL0HVyhHEICnZJkWu4HJu-ibJH9NbgbkqXNCy7R3zt6o="
+        }
+      ],
+      "role": "model"
+    },
+    "finish_reason": "STOP",
+    "usage_metadata": {
+      "candidates_token_count": 3,
+      "candidates_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 3
+        }
+      ],
+      "prompt_token_count": 495,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 495
+        }
+      ],
+      "thoughts_token_count": 86,
+      "total_token_count": 584,
+      "traffic_type": "ON_DEMAND"
+    },
+    "avg_logprobs": -5.218798637390137,
+    "invocation_id": "e-b94bb9cd-4aaa-4319-aea0-cdb48a375614",
+    "author": "verification_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "long_running_tool_ids": [],
+    "id": "34fef3d0-c4e3-48e2-b387-1c0d867c50d5",
+    "timestamp": 1780243146.2071724
+  },
+  {
+    "content": {
+      "parts": [
+        {
+          "function_response": {
+            "id": "adk-92e9b7f4-66f9-4601-84ab-29c17c6a001e",
+            "name": "list_artifacts",
+            "response": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"artifacts\":{\"artifacts\":[],\"nextCursor\":null}}"
+                }
+              ],
+              "structuredContent": {
+                "artifacts": {
+                  "artifacts": [],
+                  "nextCursor": null
+                }
+              },
+              "isError": false
+            }
+          }
+        }
+      ],
+      "role": "user"
+    },
+    "invocation_id": "e-b94bb9cd-4aaa-4319-aea0-cdb48a375614",
+    "author": "verification_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "id": "691aaacd-2146-40dc-a123-ddcdae342eeb",
+    "timestamp": 1780243148.7257042
+  },
+  {
+    "model_version": "gemini-2.5-flash",
+    "content": {
+      "parts": [
+        {
+          "text": "There are no artifacts in the ledger to process.",
+          "thought_signature": "CpUCAY89a1-NuwDwkKVVPGx6bhEQr4XTKODUOojNdDIyyMPnyT5sBYTHf46LOwK33Wft4qAX-1dcwvx4B0tLxbeBEDcs41532isA9h9tS28VSdlk0qqVIMgIcKeSVWb_ExJyXjuH2iFhwKuXaZAabRbKarGfhgvq72B6Z9SZVAFbrtj_UJ5X7OmqDcj21GMTvBwG3zKRIgWoccyplof3wwKsRBKvayM23BT3a3D8NgdfblwWxwsObVSSOMPg8GWmgbTCoDUt4fuGpmM73FCENj62Ar_N4dV4grTz6vlBzCjiBfzP6hwR0S943WpCP67kYo9vN0hKWfPs5O6Ic3_b3X3hZqqBI98-mvdsEmNfn1T1Fw_ccS-soA=="
+        }
+      ],
+      "role": "model"
+    },
+    "finish_reason": "STOP",
+    "usage_metadata": {
+      "candidates_token_count": 10,
+      "candidates_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 10
+        }
+      ],
+      "prompt_token_count": 612,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 612
+        }
+      ],
+      "thoughts_token_count": 51,
+      "total_token_count": 673,
+      "traffic_type": "ON_DEMAND"
+    },
+    "avg_logprobs": -0.9844039916992188,
+    "invocation_id": "e-b94bb9cd-4aaa-4319-aea0-cdb48a375614",
+    "author": "verification_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "id": "6e50b6d9-6cdf-4d46-9f13-dcafa78b01c1",
+    "timestamp": 1780243148.8218102
+  }
+]

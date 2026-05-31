@@ -1,0 +1,5 @@
+google-cloud-aiplatform[adk,agent_engines]>=1.95.0
+google-adk>=1.0.0
+mcp>=1.0.0
+python-dotenv
+pyjwt
