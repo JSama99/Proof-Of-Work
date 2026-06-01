@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import time
+from typing import Any, Dict, Optional
 
 import httpx
 from fastmcp import FastMCP
@@ -94,6 +95,77 @@ async def verify_entry(entry_id: str) -> dict:
         entry_id: The UUID of the ledger entry to verify.
     """
     result = await call_ledger("GET", f"/api/ledger/verify/{entry_id}")
+    return result
+
+
+@mcp.tool()
+async def append_decision(
+    title: str,
+    body: str = "",
+    artifact_type: str = "journal",
+) -> Dict[str, Any]:
+    """Create a new decision artifact in the POW Ledger.
+
+    Records the operator's decision as a SHA-256 hash-sealed artifact.
+    The Capture Agent uses this when the operator states a decision
+    worth preserving. POW Ledger automatically logs an artifact_created
+    ledger entry on creation, so this single call produces both the
+    entity and its first audit event.
+
+    Args:
+        title: Short title for the decision (1-500 chars).
+        body: Full context, reasoning, and constraints (max 100000 chars).
+        artifact_type: One of: note, sop, checklist, playbook, template,
+            workflow, spec, principles, journal, other. Default: journal.
+    """
+    payload = {"title": title, "type": artifact_type, "body": body}
+    artifact = await call_ledger("POST", "/api/artifacts", json=payload)
+    return artifact
+
+
+@mcp.tool()
+async def record_event(
+    terminal_source: str,
+    event_type: str,
+    artifact_id: Optional[str] = None,
+    artifact_type: Optional[str] = None,
+    parent_artifact_id: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Append an immutable event to the POW Ledger.
+
+    Each call writes a SHA-256 hash-sealed entry. Use to log state
+    transitions, decision checkpoints, model usage, or any audit event
+    tied to an existing artifact. The ledger is append-only — entries
+    cannot be modified after creation.
+
+    Args:
+        terminal_source: Which terminal/agent originated the event
+            (e.g. "capture-agent", "sonic-genesis", "talon-vision").
+        event_type: One of: artifact_created, artifact_revised,
+            artifact_approved, prompt_used, model_version_recorded,
+            collaborator_contribution, ownership_transfer,
+            export_published, deliverable_completed, decision_checkpoint.
+        artifact_id: UUID of the artifact this event relates to.
+        artifact_type: Type of the artifact (matches artifactTypeEnum).
+        parent_artifact_id: UUID of a parent artifact (for lineage).
+        metadata: Arbitrary additional context as a JSON object — use for
+            modelId, modelVersion, prompt text, or any field not surfaced
+            as a named argument.
+    """
+    payload: Dict[str, Any] = {
+        "terminalSource": terminal_source,
+        "eventType": event_type,
+    }
+    if artifact_id:
+        payload["artifactId"] = artifact_id
+    if artifact_type:
+        payload["artifactType"] = artifact_type
+    if parent_artifact_id:
+        payload["parentArtifactId"] = parent_artifact_id
+    if metadata:
+        payload["metadata"] = metadata
+    result = await call_ledger("POST", "/api/ledger/record", json=payload)
     return result
 
 
