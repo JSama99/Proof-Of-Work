@@ -10,7 +10,7 @@ load_dotenv()
 
 mcp_toolset = McpToolset(
     connection_params=StreamableHTTPServerParams(
-        url=f"{os.environ['MCP_URL']}/mcp",
+        url=os.environ['MCP_URL'],
         headers={"Authorization": f"Bearer {os.environ['MCP_TOKEN']}"},
     ),
 )
