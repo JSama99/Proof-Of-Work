@@ -1,0 +1,188 @@
+{
+  "agent": "capture_agent",
+  "invocation_id": "e-934fdb5c-ebd9-4725-9288-bfabe459b8f1",
+  "label": "standalone record_event (model_version_recorded) \u2014 provenance event without artifact link",
+  "prompt": "Record an event of type model_version_recorded: gemini-2.5-flash was used by the capture-agent for decision capture on 2026-06-02, via Vertex AI. Source: capture-agent. No artifact link \u2014 this is an ops-level provenance event.",
+  "tools_called": [
+    "record_event"
+  ],
+  "result_id": "z4-Tq3PAzp6SMkQKeJq6v",
+  "outcome": "success",
+  "events": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Record an event of type model_version_recorded: gemini-2.5-flash was used by the capture-agent for decision capture on 2026-06-02, via Vertex AI. Source: capture-agent. No artifact link \u2014 this is an ops-level provenance event"
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-934fdb5c-ebd9-4725-9288-bfabe459b8f1",
+      "author": "user",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "ad3e936a-f267-4267-94f9-dab15e49f55d",
+      "timestamp": 1780441452.1305878
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "function_call": {
+              "id": "adk-42359743-7d8b-4e37-adf2-3a3202403d18",
+              "args": {
+                "event_type": "model_version_recorded",
+                "terminal_source": "capture-agent",
+                "metadata": {
+                  "usage_context": "decision capture",
+                  "model_name": "gemini-2.5-flash",
+                  "platform": "Vertex AI",
+                  "date_used": "2026-06-02"
+                }
+              },
+              "name": "record_event"
+            },
+            "thought_signature": "CtgEAY89a18XjNtbBzhAmXlxTvhL75DqyEvO0ZFf9Qu19AEsY55nkF9U0bxx76j4a4T62qJOxtg1YTvdzBaI4Ksoc1lZrOufQkcu38MB1WaDpZ1Iyubk5KManvbatg8SJwLDkdUu7a_SJfiI6-Wa66PZQ4-fXk597sW90JP1gRRbeocrH9HIH8UvAP4vUh0634fGabguOt0dUs92VUwFrxhT8cFFO2iYNu0Bd9WdKeIXEI9Xa7KNTbuqP-uI2RRqbZ_KENgBCjN2ib4m7u9gyqDPGgkFYBlhaHu4v2gBSZrT3__l35Au6HhoJ-dd-WV7CiJV-uWsLm-k6H_Yd-Bk7yrQStF-rV-hyXhwJduWM0gjpm7v4UXGhEEUz7tWmyRVQ9aGcllEmuvrJBZ3TlJa9lNis2AlpR-Hl9s0We8HRLKc9M0-CM7zDWAjy60R90YiiKNeM4lY9DIjbG3NJganJfP3ApNULsIDh5XQn2B2Sc7VbP2tVLTes-V4i054EHh1ZIQ_az7yC_4ffSSdMxVLpHVD_-YNc82dCK56gV-CtQ8KdUp88_85iPLeOpeJ4zuSkCdawEl2DzDenZ05pPR_PcxAPoMguTrZOV9ymG38d5EJcJIXSoJHxzMySHDOvEarLyDZbymDXAzVbPS6HBREIcy-iOtTaMOyTdPi5aeVJmyvYPNMF8Cb-aFFuz9gU0-kGhZmRK0CpLeQNyhXCoj1CGVRpM3ie6XJ7p1WFsnWdGHMeeh3zm7hWXo6PA2_Zpdm4F2JAF5Lwgny5a6YVm-dXCQQ6G9NESR_rC5R"
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "candidates_token_count": 50,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 50
+          }
+        ],
+        "prompt_token_count": 2756,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 2756
+          }
+        ],
+        "thoughts_token_count": 176,
+        "total_token_count": 2982,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.3700696563720703,
+      "invocation_id": "e-934fdb5c-ebd9-4725-9288-bfabe459b8f1",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "long_running_tool_ids": [],
+      "id": "c606960e-92db-4574-aba3-30dbd894331b",
+      "timestamp": 1780441452.2105
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "function_response": {
+              "id": "adk-42359743-7d8b-4e37-adf2-3a3202403d18",
+              "name": "record_event",
+              "response": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"entry\":{\"id\":\"z4-Tq3PAzp6SMkQKeJq6v\",\"terminalSource\":\"capture-agent\",\"eventType\":\"model_version_recorded\",\"actorId\":\"mcp-server-agent\",\"signature\":\"d79fae056cca5abf062fc928050880d73634f275739244757a1c3b0623cc863c\",\"metadata\":{\"platform\":\"Vertex AI\",\"date_used\":\"2026-06-02\",\"model_name\":\"gemini-2.5-flash\",\"usage_context\":\"decision capture\"},\"createdAt\":\"2026-06-02T23:04:15.056Z\"}}"
+                  }
+                ],
+                "structuredContent": {
+                  "entry": {
+                    "id": "z4-Tq3PAzp6SMkQKeJq6v",
+                    "terminalSource": "capture-agent",
+                    "eventType": "model_version_recorded",
+                    "actorId": "mcp-server-agent",
+                    "signature": "d79fae056cca5abf062fc928050880d73634f275739244757a1c3b0623cc863c",
+                    "metadata": {
+                      "platform": "Vertex AI",
+                      "date_used": "2026-06-02",
+                      "model_name": "gemini-2.5-flash",
+                      "usage_context": "decision capture"
+                    },
+                    "createdAt": "2026-06-02T23:04:15.056Z"
+                  }
+                },
+                "isError": false
+              }
+            }
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-934fdb5c-ebd9-4725-9288-bfabe459b8f1",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "9d1bb662-86ad-48c1-842c-213062b0380d",
+      "timestamp": 1780441455.149576
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "text": "I have recorded the event of type `model_version_recorded` with ID: `z4-Tq3PAzp6SMkQKeJq6v`.\nThis event notes that `gemini-2.5-flash` was used by the `capture-agent` for decision capture on `2026-06-02` via Vertex AI.",
+            "thought_signature": "Ct8BAY89a18lNYFiS7pnFwMyHWFw1gBZDX9ugN1Sy1I30uqhAywI0I4GiFu64aZPOuYAfcVURehF1V2aZdJyBpoL5WQB4Ny_asP4QhFSc-v4miAuWIiYxA8gZtmz01u3QKQYlTJuZRBscPMPqTQEnTlNDrHqI8zV2Aezl5_VzPxTzSVR23ldXCWgc7wdAES5JAa6QYpouB43OJ2mcnwePLr2Mi_RMwZ3UwcZ1PnaQlnQi0gpjR_k6xZ0bEiGNi6U3bYgTvNys8-pSnQk5XUDXsxkri0x1wXHqdAGoa4sNQqI4w=="
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "cache_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 2363
+          }
+        ],
+        "cached_content_token_count": 2363,
+        "candidates_token_count": 80,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 80
+          }
+        ],
+        "prompt_token_count": 3328,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 3328
+          }
+        ],
+        "thoughts_token_count": 58,
+        "total_token_count": 3466,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.3506242990493774,
+      "invocation_id": "e-934fdb5c-ebd9-4725-9288-bfabe459b8f1",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "f4ecdbaa-a832-48d1-8867-b432f89cd438",
+      "timestamp": 1780441455.156466
+    }
+  ]
+}

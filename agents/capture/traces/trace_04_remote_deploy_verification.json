@@ -1,0 +1,260 @@
+[
+  {
+    "model_version": "gemini-2.5-flash",
+    "content": {
+      "parts": [
+        {
+          "function_call": {
+            "id": "adk-0f9b3fe7-e89b-4324-862d-8ccbc8a94d18",
+            "args": {
+              "title": "POW Capture Agent deployed to Vertex AI Agent Engine",
+              "body": "POW Capture Agent successfully deployed to Vertex AI Agent Engine on 2026-06-02 for the Google AI Agents Challenge Track 1 submission. This confirms env-var propagation and end-to-end real tool calls from the deployed reasoning engine.",
+              "artifact_type": "spec"
+            },
+            "name": "append_decision"
+          },
+          "thought_signature": "CrEJAY89a1-Twk9ZipguVVi6WMoHIcIjvn8c8aqeeCKEZG2tN5Pgmh7zsWd3c8nstDxLgGQF9HoZ288SAPrfulmcRA9de8_1OWzD1M0rcfk1EfIwKWLDgbmQ54tRxkNoYk4q4RBF2Fxv1VcpKuRdGzdoSLCQ00Hn_rG-YRWDUj3h7kTI40aJrcLAiT97sZ4QoAays5f7cwC6oSgwjruDYtuh8tQoeDFT_2l2S1Ms6j5tAnc78IioKiPKUs4i_W6iJVdTuFPBVmRki55U2pAW5LKRsknEr0VeghML4vaZO9mCnZDuIj_4wLX3GurrYxNNUD5JM8GyNCYziG8VuTm1z_Sqr7WyhZ9pPP_2B2vJMXgdLPUndDFA71JG5nGbEKGshwgSsUsJxdrzrdYzy8Hw0kmlDkegT7W9DZxpB7oXNofzFiUKKK7WdnW1HR5raKHMcvjS__1HyDTwjwwDwlMuD6nCTLTPDL6GiYl8lAS76BYPJBNe1WpZzLafQS5UJq-I1q0h7ABSjN7n3A15gcD7hX1mAmfKXXYRTOGOompKMzI1nkNfQMBk0ZxT4lgvbRILdCUhbBJR7am3jfMl3EFH0pRNyApv_eIsV91HN9l0e5wMvp27V9IxxNAhgwy_cCvcO7kUzUnepiDkFuGSoSZDBK8qMQyWv2Is4EmgqbMYr5PWw9llT0lq4FLBmXZk2LSjlg_FKRLW5FlerFACNFF5i60LISHsI_QLO88tmgxSAHbSLJEFGV1ah9r5w-gnkrxcvSxc-cLIbr-ogU9m2NMavlIv2rszeyyiVMckvcD0og1ah1LpR6M2W-T1e3Ybq03eKKBLTFmObWdxychbtCgDdsr--4xkkunVcA-ou2AxJ6VslkbWCkVtXVhwd9bpKjVJRaTEE4Y9KeW7F9-2vPRAOMORInbK3SjZbMeNxaCdc6X6aLPcyxqMdPLczV2KwTxhaUhlNB4aU5o60Y0Hwmfg2h1-nqSCifE6qEwlTNezw6lfwhBnEhsulQ7gRBFqgTuUM09-hSgkFEz-sqDFXTPW9B1e39e5P-iXBnbdp7B2Hkf6ixMzvM_LGS00NonCNMU3Ms9F0zAksNDaEGMn8UgSyYf8qQncRiIXMNiMWA4MAVO4I1xJ1xzAAkRdwsj2sBuG5FECR-A4JSNPP23QxWA9HIfjk7RvKps2aG4anod0CNfTIfMlte6U_dEzZb0mrKvowYTdQKmHHp3sJz59w3nNpzzQ14VPO1HYNby7_O3fUuQs8tf_ZO_Gh3B_G9UMQbXNO9uzd2SJit-ELYyafmdgh_beUzJ_V8izAwVX5PqSrrLzOB8xxKg-Qytbx6G5yDTxfCPLjWI0lk_AP1eoR4j55ZDV7cmbwFswImMV-6D5WPausXLf8TCF0J4E1Sv4r9vs2q7YD_OrfOdatC6InLcIsO6G1ldxLJL1R2yMXZj7IRFZNKHewOmPwo-Ilusj-WiIyTqPsq_P7zLHQTkb6KxRH0In6z5MvJTev8LnPaZQEU4MDM1YDSpbiKeiR1vopLKxGwy8BV9KcUi7s76OAbMJ_L2qPztpuwBhwJtRKjrJDTyBT0ziQ1MGOXUVcC5aIKrvCYTmMw=="
+        }
+      ],
+      "role": "model"
+    },
+    "finish_reason": "STOP",
+    "usage_metadata": {
+      "candidates_token_count": 74,
+      "candidates_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 74
+        }
+      ],
+      "prompt_token_count": 712,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 712
+        }
+      ],
+      "thoughts_token_count": 301,
+      "total_token_count": 1087,
+      "traffic_type": "ON_DEMAND"
+    },
+    "avg_logprobs": -0.661838840793919,
+    "invocation_id": "e-f2c1756f-4e00-4348-9b3e-de63bcf6fbcf",
+    "author": "capture_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "long_running_tool_ids": [],
+    "id": "0df8aa4f-520c-460e-810b-8a370e317906",
+    "timestamp": 1780444306.4614627
+  },
+  {
+    "content": {
+      "parts": [
+        {
+          "function_response": {
+            "id": "adk-0f9b3fe7-e89b-4324-862d-8ccbc8a94d18",
+            "name": "append_decision",
+            "response": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"artifact\":{\"id\":\"3Tzo0OJPLjeMC0KbTUG0Q\",\"userId\":\"mcp-server-agent\",\"title\":\"POW Capture Agent deployed to Vertex AI Agent Engine\",\"type\":\"spec\",\"structure\":{\"audience\":\"internal\",\"reusable\":false,\"includesWhy\":false,\"thinkingOnly\":false,\"expressesValues\":false,\"hasStepsOrProcess\":false,\"coordinatesToolsOrAgents\":false},\"body\":\"POW Capture Agent successfully deployed to Vertex AI Agent Engine on 2026-06-02 for the Google AI Agents Challenge Track 1 submission. This confirms env-var propagation and end-to-end real tool calls from the deployed reasoning engine.\",\"status\":\"draft\",\"isScopeExpansion\":false,\"createdAt\":\"2026-06-02T23:51:50.474Z\",\"updatedAt\":\"2026-06-02T23:51:50.474Z\",\"finishCriteria\":null,\"rtvTags\":null}}"
+                }
+              ],
+              "structuredContent": {
+                "artifact": {
+                  "id": "3Tzo0OJPLjeMC0KbTUG0Q",
+                  "userId": "mcp-server-agent",
+                  "title": "POW Capture Agent deployed to Vertex AI Agent Engine",
+                  "type": "spec",
+                  "structure": {
+                    "audience": "internal",
+                    "reusable": false,
+                    "includesWhy": false,
+                    "thinkingOnly": false,
+                    "expressesValues": false,
+                    "hasStepsOrProcess": false,
+                    "coordinatesToolsOrAgents": false
+                  },
+                  "body": "POW Capture Agent successfully deployed to Vertex AI Agent Engine on 2026-06-02 for the Google AI Agents Challenge Track 1 submission. This confirms env-var propagation and end-to-end real tool calls from the deployed reasoning engine.",
+                  "status": "draft",
+                  "isScopeExpansion": false,
+                  "createdAt": "2026-06-02T23:51:50.474Z",
+                  "updatedAt": "2026-06-02T23:51:50.474Z",
+                  "finishCriteria": null,
+                  "rtvTags": null
+                }
+              },
+              "isError": false
+            }
+          }
+        }
+      ],
+      "role": "user"
+    },
+    "invocation_id": "e-f2c1756f-4e00-4348-9b3e-de63bcf6fbcf",
+    "author": "capture_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "id": "895b3b3f-7578-4e9a-a44a-5443969e9e2a",
+    "timestamp": 1780444310.531024
+  },
+  {
+    "model_version": "gemini-2.5-flash",
+    "content": {
+      "parts": [
+        {
+          "function_call": {
+            "id": "adk-6c9a0201-f1da-48fe-ae35-3dba6f6cd641",
+            "args": {
+              "artifact_id": "3Tzo0OJPLjeMC0KbTUG0Q",
+              "terminal_source": "capture-agent",
+              "event_type": "decision_checkpoint",
+              "metadata": {
+                "date": "2026-06-02",
+                "tags": [
+                  "deployment milestone"
+                ]
+              }
+            },
+            "name": "record_event"
+          },
+          "thought_signature": "CsUDAY89a19EhAuzTX0QhlQFJjQLtcp1pAbF9JqsESNFKCvsOHW55M830ructPAtyax-kOyAJ8EbiVm0PVcX9jblU1pKWi2pUlumLbz6u5EI9ElYT6LDsET96v18DP4FCvoqHuBv_ozCw93YBk9EAQwkuLPhnm4fgg_BbZ1DOHsdVgDPFFyWNFOqz9cC0U-KC6kQ2BIhW40CgP1e5zg_mfd_XWkDEjFbxqMvyPYhs2peds93AfiOUu7U62be00EOrcthaYBo8Yq0rCMGNLNgw9tHyfZKh1kay89LLlXN35VKJYJneIzs_V_AV4L7MB2KlJAuDz4NhfA8vwry80tpeEb6hMpkH2NbMLjyiOwPG7hgj5vQzJOX3Zm9zf8QL5FJUwUmhkpEF5_t258fYteAetHhdbSC5rp6JNcOLG-X53LrjnvnvG5TqFiZI8MvxPMxu0J7gjvKXrjHqPZtVFCgeRrMTBWFP__v69d6QppY-Ev63AaB3RBE3aQKX69NfG-rmsjOL5_KjiSQ9rpentlYRo7PlD2Rjwg1ZzJur-VLU86vlt18YZ4IlgA31sr6RfkUt9s8z0CArLLHvHorWnYscmpypC4FptQK"
+        }
+      ],
+      "role": "model"
+    },
+    "finish_reason": "STOP",
+    "usage_metadata": {
+      "candidates_token_count": 47,
+      "candidates_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 47
+        }
+      ],
+      "prompt_token_count": 1502,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 1502
+        }
+      ],
+      "thoughts_token_count": 137,
+      "total_token_count": 1686,
+      "traffic_type": "ON_DEMAND"
+    },
+    "avg_logprobs": -0.36919041897388216,
+    "invocation_id": "e-f2c1756f-4e00-4348-9b3e-de63bcf6fbcf",
+    "author": "capture_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "long_running_tool_ids": [],
+    "id": "fed99d46-2a8a-48e9-bb15-55e1d25469d1",
+    "timestamp": 1780444310.6549108
+  },
+  {
+    "content": {
+      "parts": [
+        {
+          "function_response": {
+            "id": "adk-6c9a0201-f1da-48fe-ae35-3dba6f6cd641",
+            "name": "record_event",
+            "response": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{\"entry\":{\"id\":\"vuADDWoFzDUEsXLJ9YtnB\",\"terminalSource\":\"capture-agent\",\"artifactId\":\"3Tzo0OJPLjeMC0KbTUG0Q\",\"eventType\":\"decision_checkpoint\",\"actorId\":\"mcp-server-agent\",\"signature\":\"4cc9499cfd6277488fa55ba45cecb40307cc9500612b3c5a9b589c3d0a050670\",\"metadata\":{\"date\":\"2026-06-02\",\"tags\":[\"deployment milestone\"]},\"createdAt\":\"2026-06-02T23:51:52.114Z\"}}"
+                }
+              ],
+              "structuredContent": {
+                "entry": {
+                  "id": "vuADDWoFzDUEsXLJ9YtnB",
+                  "terminalSource": "capture-agent",
+                  "artifactId": "3Tzo0OJPLjeMC0KbTUG0Q",
+                  "eventType": "decision_checkpoint",
+                  "actorId": "mcp-server-agent",
+                  "signature": "4cc9499cfd6277488fa55ba45cecb40307cc9500612b3c5a9b589c3d0a050670",
+                  "metadata": {
+                    "date": "2026-06-02",
+                    "tags": [
+                      "deployment milestone"
+                    ]
+                  },
+                  "createdAt": "2026-06-02T23:51:52.114Z"
+                }
+              },
+              "isError": false
+            }
+          }
+        }
+      ],
+      "role": "user"
+    },
+    "invocation_id": "e-f2c1756f-4e00-4348-9b3e-de63bcf6fbcf",
+    "author": "capture_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "id": "aa38b4e0-d662-4427-98c2-ee968fff1bdc",
+    "timestamp": 1780444312.1353137
+  },
+  {
+    "model_version": "gemini-2.5-flash",
+    "content": {
+      "parts": [
+        {
+          "text": "Decision captured: \"POW Capture Agent deployed to Vertex AI Agent Engine\" (ID: 3Tzo0OJPLjeMC0KbTUG0Q). This decision was logged as a 'spec' artifact and tagged as a 'deployment milestone'.",
+          "thought_signature": "CrYBAY89a1_AgG68BeY6gbryIuoQf6d9HMfuLvspxJb2NMvr4E2MyyP6VcAwmveFxu11W6e8qwG0U7zejGak-UW3R0XjaNy4JLGOP7TNasfTbLEKCC5vmGEuek3q3cV71uz1Vqne7ulF2uYyPtJK4b2KdfViiGjoHFr3v6zFMFcY4b8dufWIXe2mwBXbxv_juwRAJNn4iJ84mW2tXK5fMs3T9tnfRVvYCPWAFGhcizlMXY5kjSa2gno="
+        }
+      ],
+      "role": "model"
+    },
+    "finish_reason": "STOP",
+    "usage_metadata": {
+      "candidates_token_count": 52,
+      "candidates_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 52
+        }
+      ],
+      "prompt_token_count": 2012,
+      "prompt_tokens_details": [
+        {
+          "modality": "TEXT",
+          "token_count": 2012
+        }
+      ],
+      "thoughts_token_count": 28,
+      "total_token_count": 2092,
+      "traffic_type": "ON_DEMAND"
+    },
+    "avg_logprobs": -0.24083087994502142,
+    "invocation_id": "e-f2c1756f-4e00-4348-9b3e-de63bcf6fbcf",
+    "author": "capture_agent",
+    "actions": {
+      "state_delta": {},
+      "artifact_delta": {},
+      "requested_auth_configs": {},
+      "requested_tool_confirmations": {}
+    },
+    "id": "876776fc-1618-4294-8cdd-b47dc96bc2d7",
+    "timestamp": 1780444312.229065
+  }
+]

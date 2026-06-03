@@ -1,0 +1,292 @@
+{
+  "agent": "capture_agent",
+  "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+  "prompt": "Capture a decision: we've chosen Cloud Run over GKE for the MCP server because we need scale-to-one with minimal ops overhead, and the challenge timeline doesn't justify cluster management. Tag as architecture decision.",
+  "artifact_id": "IEaO8Yxn3tAtk7hFRPHSD",
+  "event_id": "1JFMt5PJudv2HelmU76eG",
+  "tools_called": [
+    "append_decision",
+    "record_event"
+  ],
+  "events": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Capture a decision: we've chosen Cloud Run over GKE for the MCP server because we need scale-to-one with minimal ops overhead, and the challenge timeline doesn't justify cluster management. Tag as architecture decision."
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+      "author": "user",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "6c543958-2d67-4873-b5f7-4ec2ebc2db46",
+      "timestamp": 1780439733.58278
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "function_call": {
+              "id": "adk-49a737f6-91a4-4d67-afca-473e38352856",
+              "args": {
+                "title": "Chosen Cloud Run over GKE for MCP server",
+                "body": "we've chosen Cloud Run over GKE for the MCP server because we need scale-to-one with minimal ops overhead, and the challenge timeline doesn't justify cluster management.",
+                "artifact_type": "spec"
+              },
+              "name": "append_decision"
+            },
+            "thought_signature": "CucHAY89a1-LU-69wQk3ARa1W3zSWisww1KFcHxdnRi75Sk3MTEFHooLReHztbJ4rYu6A2LyRJkA9AmYnoXhcmKCCt8Zj9n8h2opnyirxGxji-_j0-R2gjHYZApUCAi--0VgUhXYhkQOJIyxonSO6dx6E-iqxcu1yyRabAOpzKr4aa6ByMSvUSKV6075hZLK5XFYk0Km07HAGerzGbb3BFSm2nQ8xOWtZ5CYBN37fNFZIe_gl4GG3iyWyPzGn0LUeLaCSA17pQ_IAvrm5f692LcNVQAeu2yE-YnE9e81bXrTluBUD6YR7i1q-TPt2p6KRhgkrLBSLW_MtYZlySxTsRFwcUy38H9LehXPOXtEqyPbqmoF66Vvwq6DcDan3IHlfU7-SchhycUvoBGEa7jPc4QcCDocqi49KAcrfzZedUP_fn7QLPYbqlJrmRD0ZPNeVxFZVxF4wjGH_ts8vdI1amuPD16CM17qy6b73cKYnAQ4H51h3dGLAvBpNxf2xcAnRlWNjsrIaN5NfD78tIf5UL67qwnb9m353lYyu00CztkBxJ5dYC0_skisNNhgwWDpOJEIQsubzGN4SUj1nARcHWmvFboIiCFZfQGgPmv5RuKJN8-Dh6Jy-50GbxoVNceAQslfS4KyY6YaFKpvETquBew-SH_z9dTsk-Bf7BnyB_n80hEwb32vSV3u9rOhu0CGQP4WlxNM2XTsvEZKffmxsNh-XCDZ9hbDA5jOca5NYtUkKxOw3OFJsg1sLQu2PW3iYr-H2Whp2F-_SrMK69zTcKzUPHP7rQ10NpPzzX53_dsAcjsKiH-ipacwZrSP0-cYErdLVuGqcpphyyJLmpYY7QZMNeBHkRFw6J3_9rNkiwXQaYj1rIs5HFhDGhmViidCtwf7gwxDY5oBxxU8JHZ5S2aP69ia5KEMUGAIhnGa4K1MR2NOy71uHXnDdHB9pYe6Az_KV0tScIX5Of4w2ifrKSGvbbOS0UlmhxTQMY1YOVkQfh30zi2sy7vaVoUeSZSXNXmzr57yKPMgqJVklR35CuRby8S6GkBsC7Q4gytc1VihATMDxizkiUcEG-w3bCcI_OMcMy552Oo4UqEAPJSY6po7h_lENpq9PwfcUAOhqn2ICFrRlhkkN9gGca2mb3pfVlTBRVdSYjur54Klb0ERQG-0Kc1tg36850TiyhySCc90oMD0mluTa12D0JJ2nQSONpQWuRvw9AP0kRtr03FBR-9gjo-OdmbwvueUqN1WHzE8gw4OKQaXnfQdDFSMj11xHiTZmlrFxnrmYoklGCTw06PMkj0iOLcoRYCpY_ju4zNnnoxJ7H0QfQgc"
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "candidates_token_count": 55,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 55
+          }
+        ],
+        "prompt_token_count": 689,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 689
+          }
+        ],
+        "thoughts_token_count": 247,
+        "total_token_count": 991,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.4712820920077237,
+      "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "long_running_tool_ids": [],
+      "id": "2dd83a5d-2a8e-439c-a682-9609830e533f",
+      "timestamp": 1780439734.032882
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "function_response": {
+              "id": "adk-49a737f6-91a4-4d67-afca-473e38352856",
+              "name": "append_decision",
+              "response": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"artifact\":{\"id\":\"IEaO8Yxn3tAtk7hFRPHSD\",\"userId\":\"mcp-server-agent\",\"title\":\"Chosen Cloud Run over GKE for MCP server\",\"type\":\"spec\",\"structure\":{\"audience\":\"internal\",\"reusable\":false,\"includesWhy\":false,\"thinkingOnly\":false,\"expressesValues\":false,\"hasStepsOrProcess\":false,\"coordinatesToolsOrAgents\":false},\"body\":\"we've chosen Cloud Run over GKE for the MCP server because we need scale-to-one with minimal ops overhead, and the challenge timeline doesn't justify cluster management.\",\"status\":\"draft\",\"isScopeExpansion\":false,\"createdAt\":\"2026-06-02T22:35:38.423Z\",\"updatedAt\":\"2026-06-02T22:35:38.423Z\",\"finishCriteria\":null,\"rtvTags\":null}}"
+                  }
+                ],
+                "structuredContent": {
+                  "artifact": {
+                    "id": "IEaO8Yxn3tAtk7hFRPHSD",
+                    "userId": "mcp-server-agent",
+                    "title": "Chosen Cloud Run over GKE for MCP server",
+                    "type": "spec",
+                    "structure": {
+                      "audience": "internal",
+                      "reusable": false,
+                      "includesWhy": false,
+                      "thinkingOnly": false,
+                      "expressesValues": false,
+                      "hasStepsOrProcess": false,
+                      "coordinatesToolsOrAgents": false
+                    },
+                    "body": "we've chosen Cloud Run over GKE for the MCP server because we need scale-to-one with minimal ops overhead, and the challenge timeline doesn't justify cluster management.",
+                    "status": "draft",
+                    "isScopeExpansion": false,
+                    "createdAt": "2026-06-02T22:35:38.423Z",
+                    "updatedAt": "2026-06-02T22:35:38.423Z",
+                    "finishCriteria": null,
+                    "rtvTags": null
+                  }
+                },
+                "isError": false
+              }
+            }
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "1785db3e-b49c-4a3e-ba35-6f0df5d31263",
+      "timestamp": 1780439738.4229062
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "function_call": {
+              "id": "adk-409ced0f-6c84-44bb-9ecb-e680370ccad9",
+              "args": {
+                "terminal_source": "capture-agent",
+                "metadata": {
+                  "reasoning": "scale-to-one with minimal ops overhead, challenge timeline doesn't justify cluster management."
+                },
+                "event_type": "decision_checkpoint",
+                "artifact_id": "IEaO8Yxn3tAtk7hFRPHSD"
+              },
+              "name": "record_event"
+            },
+            "thought_signature": "CskEAY89a19bXbkYGKVai39bJYvlyOoX523qnvdVhCMYQg7YKiMWDLIdBCcJwd90qnjGrXnEWRgd2Hbd032UsYg1VbiwnfC5MD2UlQ-peSz5FFOUlfV58krqC8rjb9zqlh8avJsLqrSNeuCDJs4hTUiL7OZRIpkGDYPGDDfnp59sHRy6RtbjkaLXFcVh7nNNkWCqAwUDXs4TOt2_QWFgGjpyInH2JmTKyrx0BkUiIjozkiAdyi_eZD_TXQkHBKOkm36wygkul70rDb9dGtO_3qgNruDumeqTQG7Z6uLj1hDttxR1GSdIhmZ7ty90lMEYDBDv90KbIwjb_QC1Z8655kt_vHhDbPhnMmyHUIfiwkeOmemR56Yw-J4CmbL-IreP-bez_OViWAN2DcDHRHBFxVBNq1b8zqZIk6Bwyc2-hzR15zCeTPxqrsKMjBEOlt_uPZngcZ7O3XgKUbY8XgR-KslghwBJveWQRzvJPLZsKNLL_ryKzfPPBakAEzHez3detS-pG-N_z9D9gBKNMeirfGrKvgjUvfeQFquXBx-H7-0tE9YQJtrFVWJVD15asiKp6_r0qbY023O630fhnIP4Q_zZgYz3sJzkGQGJ0nVScr5YUqkPsWTMwCkJ4YVzLKfh6xAUv91gZdxCfdvXwmC2yNuX2R3sx17oRN-ZI4HfEMy4k5FzN6AH8PI7y2gp_Ka4A_2V-qExNuseHGNDnjm-1hxMWpxPH8bpLbaZb1VlbLlY0iTzkpIK19wHoN_BfI4brzCoECR4Ad4sZ8QQ"
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "cache_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 1360
+          }
+        ],
+        "cached_content_token_count": 1360,
+        "candidates_token_count": 55,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 55
+          }
+        ],
+        "prompt_token_count": 1370,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 1370
+          }
+        ],
+        "thoughts_token_count": 152,
+        "total_token_count": 1577,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.517527285489169,
+      "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "long_running_tool_ids": [],
+      "id": "8c639608-119a-4df0-bc81-7d5d8e77ab66",
+      "timestamp": 1780439738.431167
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "function_response": {
+              "id": "adk-409ced0f-6c84-44bb-9ecb-e680370ccad9",
+              "name": "record_event",
+              "response": {
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{\"entry\":{\"id\":\"1JFMt5PJudv2HelmU76eG\",\"terminalSource\":\"capture-agent\",\"artifactId\":\"IEaO8Yxn3tAtk7hFRPHSD\",\"eventType\":\"decision_checkpoint\",\"actorId\":\"mcp-server-agent\",\"signature\":\"d42077d503259972bb2293034407d082b417dd1488859cfece437e6dcda49092\",\"metadata\":{\"reasoning\":\"scale-to-one with minimal ops overhead, challenge timeline doesn't justify cluster management.\"},\"createdAt\":\"2026-06-02T22:35:40.554Z\"}}"
+                  }
+                ],
+                "structuredContent": {
+                  "entry": {
+                    "id": "1JFMt5PJudv2HelmU76eG",
+                    "terminalSource": "capture-agent",
+                    "artifactId": "IEaO8Yxn3tAtk7hFRPHSD",
+                    "eventType": "decision_checkpoint",
+                    "actorId": "mcp-server-agent",
+                    "signature": "d42077d503259972bb2293034407d082b417dd1488859cfece437e6dcda49092",
+                    "metadata": {
+                      "reasoning": "scale-to-one with minimal ops overhead, challenge timeline doesn't justify cluster management."
+                    },
+                    "createdAt": "2026-06-02T22:35:40.554Z"
+                  }
+                },
+                "isError": false
+              }
+            }
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "5e41b0e9-05ff-490b-bd16-0a81d30350e2",
+      "timestamp": 1780439740.506285
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "text": "Decision captured: \"Chosen Cloud Run over GKE for MCP server\" (ID: IEaO8Yxn3tAtk7hFRPHSD).",
+            "thought_signature": "CuIBAY89a1-MciED2QF-8Gh2gLv2lzR5_Kiyy9OZCVyUW3fPcxG4r5vZfF96xPExzyofkn-8oT8kSav6tzmnU_FXlBtu7v39ooyaRcRFD-_AjZ_quAupjxaTwnoayskhClk8iuZbOJwO3isjdf7vIqe4EOPdKu4FvCEOR9jBW-ooOYnI23-ZJh9jfpSDYF0GLaMIrc_2wWSuYRyKE145a_q8epfEJtcO20MYvto2o3spHWIudlcDjTJaPwIxo6ZxnE5CcbiEBklfi3RKPhT5fxhLReslnqsqgmRFK-_FkLqqZCHknA=="
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "candidates_token_count": 33,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 33
+          }
+        ],
+        "prompt_token_count": 1918,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 1918
+          }
+        ],
+        "thoughts_token_count": 50,
+        "total_token_count": 2001,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.19235983761874112,
+      "invocation_id": "e-7db57457-f57b-45cf-b231-a49f3610ce04",
+      "author": "capture_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "59da0ad4-ab63-469d-8373-64b6f93d5e02",
+      "timestamp": 1780439740.513681
+    }
+  ]
+}

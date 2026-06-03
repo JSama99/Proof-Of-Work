@@ -1,0 +1,143 @@
+{
+  "agent": "orchestrator_agent",
+  "invocation_id": "e-d8c8cca8-39da-4e99-adbf-c0b3e9c25f4c",
+  "events": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "Capture a decision: validated the Operator agent routing in Phase 3 build on 2026-06-02. Tag as test milestone, artifact_type=spec."
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-d8c8cca8-39da-4e99-adbf-c0b3e9c25f4c",
+      "author": "user",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "10a956c8-112c-4081-b6d6-d2c2f9482716",
+      "timestamp": 1780476059.467882
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "function_call": {
+              "id": "adk-54e8c789-150f-4441-94c4-cb0096e1fadf",
+              "args": {
+                "content": "validated the Operator agent routing in Phase 3 build on 2026-06-02. Tag as test milestone, artifact_type=spec."
+              },
+              "name": "capture_decision"
+            },
+            "thought_signature": "CucDAY89a19lMtDRO8RCe7FHAAQ9pF4uymsYGwhm9phXhdLexGz3YTb7958V17H-3VYQENRpV3uc5T9r5XUDkCmY5NaLd_IV6vT0n_j-pE_jQBf3G2uGoZqmxXltBJ6VwgcX8bSuwb4p7aGN1d8d9m9omg3_-gKFFVoBXhMZbwSzs4j93SLBOY--kQasagYGWJSm1DdBOP7kTp18RYttGfqBGBw2VC0IvhnJB9Pp1nCie1W8EfSEzdiVRqtrB2iMBjMl0dC9scp75tLZ0ogjpPFvmUjRCfitDKsNaTMJXVlHDooN9it67AKaWPEnN9x-eGJsxihwdPn6uGJkvv9Ino5GPRkysaRiWzEBQl1MOE41uJ9FgGJQMbTCqz2fF-EOWBo0oLqRZ0e3zCEWg52pD1pZutzfl3hrsVt-0ZoJXZWTQKIvMA0SXUgXc0FOvCuXMFYa17AwqPeCruvv1-G-jAJUnm3jV8RNbnEcIc7MdYFfLopzGD5_IMVy56JWDy3exGLLStNyeRstNnET1QE9DYuQ05T3scNwobTl_YxnlM9LIco0m-S2FcDnD0IIDUWpY5-l7jflk5UhuarSJF5MD_Qcnux-v26gputRE6s6yA2i17nARaSymP2gcvsRrUAf6jRPyBpbFzGfCQ=="
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "candidates_token_count": 38,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 38
+          }
+        ],
+        "prompt_token_count": 700,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 700
+          }
+        ],
+        "thoughts_token_count": 103,
+        "total_token_count": 841,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.4111079416776958,
+      "invocation_id": "e-d8c8cca8-39da-4e99-adbf-c0b3e9c25f4c",
+      "author": "operator_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "long_running_tool_ids": [],
+      "id": "8dcbafcb-ba52-4541-a9a6-1ba9d6908492",
+      "timestamp": 1780476059.5235431
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "function_response": {
+              "id": "adk-54e8c789-150f-4441-94c4-cb0096e1fadf",
+              "name": "capture_decision",
+              "response": {
+                "result": "Decision captured: \"Validated Operator agent routing in Phase 3 build\" (ID: Zv4kkcGINEzprfIjK_m9c). This was tagged as a test milestone."
+              }
+            }
+          }
+        ],
+        "role": "user"
+      },
+      "invocation_id": "e-d8c8cca8-39da-4e99-adbf-c0b3e9c25f4c",
+      "author": "operator_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "3a2f5ca3-7155-4e06-9e90-ef3af20a2d93",
+      "timestamp": 1780476075.104525
+    },
+    {
+      "model_version": "gemini-2.5-flash",
+      "content": {
+        "parts": [
+          {
+            "text": "I have captured the decision: \"Validated Operator agent routing in Phase 3 build\" (ID: Zv4kkcGINEzprfIjK_m9c). This was tagged as a test milestone."
+          }
+        ],
+        "role": "model"
+      },
+      "finish_reason": "STOP",
+      "usage_metadata": {
+        "candidates_token_count": 43,
+        "candidates_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 43
+          }
+        ],
+        "prompt_token_count": 885,
+        "prompt_tokens_details": [
+          {
+            "modality": "TEXT",
+            "token_count": 885
+          }
+        ],
+        "total_token_count": 928,
+        "traffic_type": "ON_DEMAND"
+      },
+      "avg_logprobs": -0.16534561334654344,
+      "invocation_id": "e-d8c8cca8-39da-4e99-adbf-c0b3e9c25f4c",
+      "author": "operator_agent",
+      "actions": {
+        "state_delta": {},
+        "artifact_delta": {},
+        "requested_auth_configs": {},
+        "requested_tool_confirmations": {}
+      },
+      "id": "0409746a-c77f-4572-b0a6-56133efac543",
+      "timestamp": 1780476075.112138
+    }
+  ]
+}
