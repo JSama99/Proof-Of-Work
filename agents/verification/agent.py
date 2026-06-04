@@ -1,4 +1,9 @@
 import os
+from urllib.parse import urlparse
+
+import google.auth.transport.requests
+from google.oauth2 import id_token
+from google.auth.exceptions import DefaultCredentialsError
 from dotenv import load_dotenv
 from google.adk.agents import LlmAgent
 from google.adk.tools.mcp_tool import McpToolset
@@ -8,10 +13,46 @@ from pattern_detection import propose_workflow_tool
 
 load_dotenv()
 
+MCP_URL = os.environ["MCP_URL"]
+
+# Audience for Google-signed ID tokens is the Cloud Run base URL — no path.
+# urlparse handles trailing /mcp, /, or no path uniformly.
+_parsed = urlparse(MCP_URL)
+MCP_AUDIENCE = f"{_parsed.scheme}://{_parsed.netloc}"
+
+
+def _fetch_mcp_id_token() -> str:
+    """Fetch a Google-signed ID token scoped to the MCP server's audience.
+
+    On Vertex AI Agent Engine, ADC resolves to the runtime service account
+    via the metadata server and this returns a valid ID token. Locally,
+    ADC from `gcloud auth application-default login` is USER credentials,
+    which `id_token.fetch_id_token` does not accept (it requires service
+    account creds or a metadata server). In that case we return "" so
+    `deploy.py`'s `from agent import root_agent` can succeed; agent.py
+    is uploaded as an extra_package and re-imported on Vertex AI where
+    the real token is minted.
+
+    Known limitation: ID tokens expire after 1 hour. If a runtime container
+    stays warm past that window, MCP calls will start returning 401.
+    For demo / submission workloads with short-lived invocations this is
+    fine. Production hardening would require subclassing McpSessionManager
+    to expose httpx's auth callback — see google/adk-python#2759.
+    """
+    try:
+        return id_token.fetch_id_token(
+            google.auth.transport.requests.Request(),
+            MCP_AUDIENCE,
+        )
+    except DefaultCredentialsError:
+        # Local-dev import only — never executed on Vertex AI.
+        return ""
+
+
 mcp_toolset = McpToolset(
     connection_params=StreamableHTTPServerParams(
-        url=os.environ['MCP_URL'],
-        headers={"Authorization": f"Bearer {os.environ['MCP_TOKEN']}"},
+        url=MCP_URL,
+        headers={"Authorization": f"Bearer {_fetch_mcp_id_token()}"},
     ),
 )
 

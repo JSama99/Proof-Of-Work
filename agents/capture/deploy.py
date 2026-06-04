@@ -37,12 +37,10 @@ remote = agent_engines.create(
         "google-adk>=1.0.0",
         "mcp>=1.0.0",
         "python-dotenv",
-        "pyjwt",
     ],
     extra_packages=["./agent.py"],
     env_vars={
         "MCP_URL": os.environ["MCP_URL"],
-        "MCP_TOKEN": os.environ["MCP_TOKEN"],
     },
 )
 

@@ -6,16 +6,42 @@ Restricted to write tools only via tool_filter — enforces the architectural
 principle that only Capture can mutate the ledger.
 """
 import os
+from urllib.parse import urlparse
+
+import google.auth.transport.requests
+from google.oauth2 import id_token
+from google.auth.exceptions import DefaultCredentialsError
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 
 load_dotenv()
 
+MCP_URL = os.environ["MCP_URL"]
+_parsed = urlparse(MCP_URL)
+MCP_AUDIENCE = f"{_parsed.scheme}://{_parsed.netloc}"
+
+
+def _fetch_mcp_id_token() -> str:
+    """Fetch a Google-signed ID token for the MCP server.
+
+    Succeeds on Vertex AI Agent Engine (metadata server present).
+    Falls back to "" locally so deploy.py can import this module;
+    agent.py is re-imported on Vertex AI where the real token is minted.
+    """
+    try:
+        return id_token.fetch_id_token(
+            google.auth.transport.requests.Request(),
+            MCP_AUDIENCE,
+        )
+    except DefaultCredentialsError:
+        return ""
+
+
 mcp_toolset = McpToolset(
     connection_params=StreamableHTTPConnectionParams(
-        url=os.environ["MCP_URL"],
-        headers={"Authorization": f"Bearer {os.environ['MCP_TOKEN']}"},
+        url=MCP_URL,
+        headers={"Authorization": f"Bearer {_fetch_mcp_id_token()}"},
     ),
     tool_filter=["append_decision", "record_event"],
 )
