@@ -1,210 +1,273 @@
 # POW Ledger Verification System
 
-**Verifiable decision infrastructure for modern operators — powered by two collaborating agents over the Agent-to-Agent (A2A) protocol.**
+A multi-agent AI system that captures organizational decisions as cryptographically sealed artifacts and verifies their integrity through an immutable ledger.
 
-> **Status:** In active development for the [Google for Startups AI Agents Challenge 2026](https://devpost.team/google-cloud-for-startups/hackathons/3197) (Track 1 · Build). The standalone POW Ledger application is deployed and operational; the multi-agent verification layer ships by submission deadline (June 5, 2026).
+Built with Google ADK, Gemini 2.5 Flash, and Vertex AI Agent Engine for the Google for Startups AI Agents Challenge 2026 (Track 1).
 
 ---
 
 ## What it does
 
-POW Ledger captures, verifies, and reuses the daily operating decisions that knowledge workers normally lose. Two agents collaborate:
+Organizations make thousands of decisions — architecture choices, policy changes, strategic pivots — but rarely have a system of record for *why* those decisions were made, *who* made them, or *whether* the record has been tampered with. POW Ledger solves this.
 
-- **Decision Capture Agent** watches Gmail, Calendar, and Drive via Google's Workspace MCP servers, detecting decision-shaped signals as they happen.
-- **Verification Agent** receives proposed entries over the A2A protocol, validates them against the existing ledger, detects patterns across repeated decision sequences, and synthesizes reusable workflows when a pattern crosses threshold.
+A user describes a decision in natural language. The system captures it as a cryptographically hashed artifact, links events to it over time, and later verifies that no entry in the decision's lineage has been altered. Three specialized agents collaborate through a single orchestrator, enforcing a strict single-writer protocol: only one agent can mutate the ledger, while another independently verifies integrity.
 
-Every record is SHA-256 hash-sealed. Every agent contribution is provenanced with `modelId` and `modelVersion`. The operator approves; the agents do the structuring. Decision capture becomes ambient — and every codified workflow makes the next decision faster, more defensible, and auditable.
+**Example flow:**
 
----
+```
+User: "Capture this decision: We are standardizing on PCOMJR architecture
+       across all TalonSight terminals for consistent artifact provenance tracking"
 
-## Try it
+System: Decision captured.
+        Artifact ID: art_7f3a...
+        SHA-256 hash: e4b2c9...
+        Event recorded with signature verification.
 
-- **Live demo:** [https://pow-ledger-xxxxx.run.app](https://pow-ledger-xxxxx.run.app) *(replace with actual Cloud Run URL)*
-- **Judge login:** `judge` / *(see Devpost submission)*
-- **Demo video (1:45):** *uploaded by June 5*
-- **Devpost submission:** *link added once registered*
+User: "Verify artifact art_7f3a..."
+
+System: Entry 1 — Valid ✅ (hash recomputed, matches stored)
+        Entry 2 — Valid ✅ (event signature verified)
+        No automatable workflow patterns detected (< 3 similar decisions).
+```
 
 ---
 
 ## Architecture
 
-![POW Ledger Verification System — Multi-Agent Architecture](docs/architecture.svg)
+```
+User → Orchestrator Agent (router, no direct ledger access)
+         ├── capture_decision → Capture Agent (single-writer)
+         │      └── append_decision + record_event → MCP Server → Ledger API → Cloud SQL
+         └── verify_artifact → Verification Agent (reader)
+                └── get_lineage + verify_entry + propose_workflow → MCP Server → Ledger API
+```
 
-Two agents on Vertex AI Gemini, deployed on Cloud Run. The existing POW Ledger backend exposes its API as MCP tools via a FastMCP server. The Verification Agent uses those tools to read ledger state and write verified entries. The Decision Capture Agent uses Google's Workspace MCP servers to watch external signals. The two agents communicate over A2A.
+![Architecture Diagram](docs/architecture.svg)
 
-**The approval gate is structural.** Nothing enters the verified record without explicit human approval. The agents propose; the founder decides.
+*For the full interactive architecture diagram, open `architecture_diagram.html` in a browser.*
+
+Three agents deployed on **Vertex AI Agent Engine**, communicating via **Agent-to-Agent (A2A)** protocol using `stream_query`. Each agent runs **Gemini 2.5 Flash** with specialized instructions and tool access.
+
+An **MCP Server** on Cloud Run implements the **Streamable HTTP** protocol, exposing 5 tools. The server mints a fresh Google ID token per request, solving the 1-hour token expiry problem inherent to long-running agent sessions.
+
+A **Ledger API** on Cloud Run handles decision persistence, SHA-256 hash computation, and integrity verification against a **Cloud SQL (PostgreSQL)** database.
+
+### Key design decisions
+
+**Single-writer protocol.** Only the Capture Agent can mutate the ledger (`append_decision`, `record_event`). The Verification Agent has read-only access (`get_lineage`, `verify_entry`, `propose_workflow`). The Orchestrator has no direct ledger access at all — it routes via A2A. This separation prevents write conflicts and makes the integrity model auditable.
+
+**MCP over direct function calls.** Rather than giving each agent direct database access, all ledger operations go through an MCP Server implementing the Streamable HTTP protocol. This provides a clean tool interface, centralizes authentication, and makes the system extensible.
+
+**Fresh ID tokens per request.** ADK's built-in `McpToolset` crashes on Agent Engine with a `TaskGroup` error due to async event loop conflicts. We replaced it with direct HTTP wrapper functions that implement the MCP Streamable HTTP protocol manually, minting a fresh Google ID token for each call. This also fixes the 1-hour token expiry issue.
+
+**Anti-code-generation instructions.** Gemini 2.5 Flash occasionally generates Python code instead of calling tools when sub-agents are invoked directly. Adding explicit instructions ("NEVER generate Python code, NEVER use `print()`") to each agent's system prompt eliminates this.
 
 ---
 
-## Technology
+## Technology stack
 
-| Layer | Choice |
-|-------|--------|
-| Reasoning | **Gemini** via **Vertex AI** (us-central1) |
-| Agent orchestration | **Agent Development Kit (ADK)** |
-| Multi-agent communication | **Agent-to-Agent (A2A) protocol** |
-| Tool boundary | **Model Context Protocol (MCP)** — via **FastMCP** |
-| External tool servers | **Google Workspace MCPs** (Gmail, Calendar, Drive) |
-| Runtime | **Cloud Run** (multi-service) |
-| Persistence | **Cloud SQL Postgres** + **Drizzle ORM** |
-| Frontend | React, Vite, shadcn/ui, Tailwind |
-| Backend | Express, TypeScript |
-| Verification primitive | SHA-256 hash-sealed ledger entries |
+| Component | Technology | Purpose |
+|---|---|---|
+| Agent framework | Google ADK (Python) | Agent definition, tool binding, A2A routing |
+| Model | Gemini 2.5 Flash | Reasoning for all three agents |
+| Agent hosting | Vertex AI Agent Engine | Production deployment, session management |
+| MCP Server | FastMCP + Cloud Run | Streamable HTTP tool server (5 tools) |
+| Ledger API | Express + Cloud Run | Decision storage, SHA-256 hashing |
+| Database | Cloud SQL (PostgreSQL) | Persistent ledger store |
+| Frontend | React, Vite, shadcn/ui, Tailwind | Ledger dashboard and artifact browser |
+| Eval | Python (custom harness) | 6 automated test scenarios |
+
+**GCP Project:** `proof-of-work-497822` · **Region:** `us-central1`
+
+---
+
+## Agent inventory
+
+### Orchestrator Agent
+- **Role:** Router. Receives user prompts, classifies intent, routes to the appropriate sub-agent via A2A.
+- **Tools:** `capture_decision` (calls Capture Agent), `verify_artifact` (calls Verification Agent)
+- **Ledger access:** None.
+
+### Capture Agent
+- **Role:** Single-writer. The only agent authorized to mutate the ledger.
+- **Tools:** `append_decision` (creates artifact with SHA-256 hash), `record_event` (links event with signature), `list_artifacts` (reads artifact index)
+- **MCP calls:** Direct HTTP to MCP Server with per-request ID token auth
+
+### Verification Agent
+- **Role:** Reader. Independently verifies ledger integrity without write access.
+- **Tools:** `get_lineage` (retrieves full entry chain), `verify_entry` (recomputes SHA-256 hash), `propose_workflow` (pattern detection across 3+ similar decisions)
+- **MCP calls:** Direct HTTP to MCP Server with per-request ID token auth
+
+---
+
+## MCP tool reference
+
+| Tool | Agent | Direction | Description |
+|---|---|---|---|
+| `append_decision` | Capture | Write | Create a new decision artifact with SHA-256 hash |
+| `record_event` | Capture | Write | Link an event to an existing artifact with signature |
+| `list_artifacts` | Capture | Read | List all artifacts in the ledger |
+| `get_lineage` | Verification | Read | Get full entry chain for a given artifact ID |
+| `verify_entry` | Verification | Read | Recompute SHA-256 and compare against stored hash |
+| `propose_workflow` | Verification | Read | Detect repeated patterns across similar decisions |
+
+---
+
+## Running locally
+
+### Prerequisites
+- Python 3.11+, Node.js 18+, Google Cloud CLI
+- `gcloud auth application-default login`
+
+### Start the frontend
+```bash
+npm install && npm run dev
+# → http://localhost:3000
+```
+
+### Run the eval harness
+```bash
+source agents/verification/.venv/bin/activate
+python eval_harness.py
+# → 6/6 passed, ~54s → eval_report.json
+```
+
+### Test the Orchestrator
+```bash
+ORCH=$(cat agents/orchestrator/deployed_resource.txt)
+
+# Capture a decision
+python -c "
+import vertexai
+from vertexai import agent_engines
+vertexai.init(project='proof-of-work-497822', location='us-central1')
+orch = agent_engines.get('$ORCH')
+session = orch.create_session(user_id='demo-user')
+for event in orch.stream_query(user_id='demo-user', session_id=session['id'],
+    message='Capture this decision: We are standardizing on PCOMJR architecture across all TalonSight terminals'):
+    content = event.get('content', {})
+    for part in content.get('parts', []):
+        if 'text' in part: print(part['text'])
+"
+
+# Verify an artifact (replace ARTIFACT_ID)
+python -c "
+import vertexai
+from vertexai import agent_engines
+vertexai.init(project='proof-of-work-497822', location='us-central1')
+orch = agent_engines.get('$ORCH')
+session = orch.create_session(user_id='demo-user')
+for event in orch.stream_query(user_id='demo-user', session_id=session['id'],
+    message='Verify artifact ARTIFACT_ID'):
+    content = event.get('content', {})
+    for part in content.get('parts', []):
+        if 'text' in part: print(part['text'])
+"
+```
+
+---
+
+## Eval harness
+
+`eval_harness.py` runs 6 automated scenarios in ~54 seconds:
+
+| # | Scenario | Tests |
+|---|---|---|
+| 1 | Round-trip E2E | Capture a decision, verify the resulting artifact |
+| 2 | Routing: capture | Orchestrator routes decision capture correctly |
+| 3 | Routing: verify | Orchestrator routes verification correctly |
+| 4 | Non-decision rejection | System rejects casual non-decision input |
+| 5 | Invalid ID handling | Graceful handling of non-existent artifact IDs |
+| 6 | List artifacts | Capture Agent's `list_artifacts` returns data |
+
+Results saved to `eval_report.json`.
 
 ---
 
 ## Repository structure
 
 ```
-pow-ledger/
-├── client/              React frontend (shadcn/ui, dark theme)
-├── server/              Express backend + ledger API + verification logic
-├── shared/              Drizzle schema (artifacts, proof units, ledger entries)
-├── mcp-server/          FastMCP server exposing ledger API as MCP tools
+Proof-Of-Work/
 ├── agents/
-│   ├── capture/         Decision Capture Agent (ADK + Vertex AI Gemini)
-│   └── verification/    Verification Agent (ADK + Vertex AI Gemini)
+│   ├── orchestrator/           # Orchestrator agent (ADK + Vertex AI)
+│   │   ├── agent.py            # A2A routing via capture_decision + verify_artifact
+│   │   ├── deploy.py           # Agent Engine deployment script
+│   │   └── deployed_resource.txt
+│   ├── capture/                # Capture agent (single-writer)
+│   │   ├── agent.py            # MCP wrappers: append_decision, record_event, list_artifacts
+│   │   ├── deploy.py
+│   │   └── deployed_resource.txt
+│   └── verification/           # Verification agent (reader)
+│       ├── agent.py            # MCP wrappers: get_lineage, verify_entry, propose_workflow
+│       ├── pattern_detection.py
+│       ├── deploy.py
+│       ├── tests/
+│       └── deployed_resource.txt
+├── mcp-server/                 # FastMCP server (Streamable HTTP, Cloud Run)
+│   ├── server.py
+│   ├── Dockerfile
+│   └── requirements.txt
+├── server/                     # Ledger API backend (Express, Cloud Run)
+│   ├── routes.ts               # REST endpoints for ledger operations
+│   ├── storage.ts              # Cloud SQL persistence
+│   └── db.ts
+├── client/                     # React frontend (Vite + shadcn/ui)
+│   └── src/
+│       ├── components/
+│       │   ├── ledger-dashboard.tsx
+│       │   ├── artifact-list.tsx
+│       │   ├── artifact-editor.tsx
+│       │   └── snapshot-view.tsx
+│       └── pages/
+├── shared/                     # Drizzle schema
+│   └── schema.ts
 ├── docs/
 │   ├── architecture.svg
 │   ├── business-case.md
-│   └── demo-script.md
-├── drizzle.config.ts
+│   ├── demo-script.md
+│   └── SUBMISSION.md
+├── eval_harness.py             # 6-scenario automated eval
+├── eval_report.json            # Latest results (6/6 pass)
+├── architecture_diagram.html   # Interactive architecture diagram
 └── package.json
 ```
 
 ---
 
-## How the multi-agent flow works
-
-1. **Operator acts in their workspace.** Sends an email, accepts a calendar invite, writes a doc.
-2. **Decision Capture Agent observes via MCP.** Connects to Gmail / Calendar / Drive MCP servers, identifies decision-shaped signals, drafts a proposed ledger entry.
-3. **A2A handoff.** Capture sends the proposal to Verification over the A2A protocol — a real protocol boundary, not an internal function call. This mirrors enterprise separation-of-duties.
-4. **Verification reasons over the ledger.** Verification calls the POW MCP Server (`list_artifacts`, `get_lineage`, `detect_patterns`) to validate the proposal, check for duplicates, and detect whether this decision is part of a repeating sequence.
-5. **Pattern threshold + workflow synthesis.** When a sequence repeats (default: 3 times), Verification synthesizes a reusable workflow artifact and surfaces it to the operator.
-6. **Human approval gate.** The operator reviews in the POW Ledger UI. Approval emits a new ledger entry with the contributing `modelId` and `modelVersion` recorded.
-7. **Verifiable record.** The new entry is SHA-256 hash-sealed and lineage-linked to the source decisions it was generalized from. Exportable as a Black Box audit artifact the operator owns.
-
----
-
-## Why multi-agent
-
-Two design pressures shaped the architecture:
-
-**Separation of duties.** A single agent that both captures workspace signals and certifies the ledger creates a structural trust problem — the same system that ingests data also vouches for it. Splitting Capture (proposes) from Verification (validates and writes) mirrors the audit pattern enterprises already trust. The A2A protocol boundary makes this separation explicit and verifiable rather than implicit.
-
-**Enterprise interoperability.** The Verification Agent speaks A2A, which means it can be discovered and addressed by other enterprise agents in the Gemini Enterprise and Google Cloud Marketplace ecosystem. An HR agent capturing hiring decisions, a sales agent capturing pricing decisions, a compliance agent monitoring policy adherence — all of these can flow decisions into POW Ledger as a shared verification substrate. POW becomes the verification layer that other agents trust.
-
----
-
-## Run locally
-
-**Prerequisites:**
-- Node.js 20+
-- Python 3.11+ (for the MCP server and agents)
-- Postgres 15+ (local or Cloud SQL Proxy)
-- Google Cloud project with Vertex AI, Cloud Run, Cloud SQL APIs enabled
-- Application Default Credentials configured (`gcloud auth application-default login`)
-
-**Frontend + backend (existing POW Ledger):**
-
-```bash
-npm install
-cp .env.example .env       # fill in DATABASE_URL, SESSION_SECRET
-npm run db:push            # apply Drizzle schema
-npm run dev                # http://localhost:5000
-```
-
-**MCP server:**
-
-```bash
-cd mcp-server
-pip install -r requirements.txt
-python server.py           # default port 8081
-```
-
-**Agents:**
-
-```bash
-cd agents/verification
-pip install -r requirements.txt
-python -m verification_agent
-
-cd agents/capture
-pip install -r requirements.txt
-python -m capture_agent
-```
-
-Local development uses A2A over loopback. Production routes A2A through Cloud Run service-to-service authentication.
-
----
-
 ## Deployment
 
-Both agents and the MCP server deploy as separate Cloud Run services. The POW Ledger app is a third Cloud Run service. Cloud SQL Postgres backs the ledger.
-
-```bash
-# Deploy POW Ledger app
-gcloud run deploy pow-ledger \
-  --source . \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --memory 1Gi
-
-# Deploy MCP server
-gcloud run deploy pow-mcp-server \
-  --source ./mcp-server \
-  --region us-central1 \
-  --no-allow-unauthenticated
-
-# Deploy agents
-gcloud run deploy pow-verification-agent \
-  --source ./agents/verification \
-  --region us-central1 \
-  --no-allow-unauthenticated
-
-gcloud run deploy pow-capture-agent \
-  --source ./agents/capture \
-  --region us-central1 \
-  --no-allow-unauthenticated
 ```
-
-Service-to-service auth uses Cloud Run's native IAM identity tokens. Secrets (database URL, API keys) come from Google Secret Manager.
+Orchestrator   → projects/878967828995/locations/us-central1/reasoningEngines/1392182381636485120
+Capture        → projects/878967828995/locations/us-central1/reasoningEngines/3575852056818221056
+Verification   → projects/878967828995/locations/us-central1/reasoningEngines/5023772531157368832
+MCP Server     → pow-mcp-server-878967828995.us-central1.run.app/mcp
+Ledger API     → pow-ledger-878967828995.us-central1.run.app
+```
 
 ---
 
-## Track 1 implementation notes
+## Findings and learnings
 
-This submission targets **Track 1 · Build (Net-New Agents)**. The Track 1 requirements and where each lives in this repo:
+**What worked:** The single-writer protocol eliminates race conditions and makes integrity verification meaningful. Vertex AI Agent Engine provides production-grade session management out of the box. Streamable HTTP for MCP is more reliable than SSE on Cloud Run.
 
-| Requirement | Implementation |
-|-------------|----------------|
-| Net-new autonomous agent | `agents/capture/` and `agents/verification/` (both built during contest period) |
-| Built with ADK | Both agents use the Agent Development Kit for orchestration |
-| Gemini-powered | Both agents call Gemini via Vertex AI (not AI Studio) |
-| MCP for external tool connection | Verification connects to `mcp-server/` (POW Ledger tools); Capture connects to Google Workspace MCPs |
-| Move from static code to declarative intent | Agents reason over ledger state and propose workflows rather than executing predefined logic |
-| Multi-agent collaboration | A2A protocol between Capture and Verification |
-| Grounding / RAG | Verification agent grounds responses in the operator's own ledger history via MCP |
-| Human-in-the-loop governance | Founder approval gate before any verified ledger write |
+**What we learned the hard way:** ADK's `McpToolset` crashes on Agent Engine (TaskGroup error) — direct HTTP wrappers are the fix. ID tokens expire silently after 1 hour — mint fresh per request. Gemini generates code instead of calling tools when sub-agents are invoked directly — anti-code-generation instructions fix this. Import-time `agent_engines.get()` calls cause fatal startup failures — lazy accessors solve it.
+
+**What we'd do differently:** Build MCP tool schemas before agent development. Add structured Cloud Logging to MCP invocations. Implement a dead-letter queue for failed writes.
 
 ---
 
 ## Business case
 
-See [`docs/business-case.md`](docs/business-case.md) for the full business case: customer segments, pricing, wedge, market sizing, and the platform-extension story via A2A interoperability.
+See [`docs/business-case.md`](docs/business-case.md) for the full analysis.
 
-Short version: verifiable decision infrastructure for SMB operators — independent consultancies, fractional executives, compliance-conscious small businesses, and bootstrapped founders — priced from $29/month (solo) to $299/month (compliance tier), with a platform/A2A usage tier for embedding POW Ledger inside other enterprise agents.
+POW Ledger addresses a gap in organizational decision management. Decisions are scattered across Slack, email, meeting notes, and undocumented memory. When questions arise — "Why did we choose this vendor?", "Who approved this change?" — there's no system of record. POW Ledger provides cryptographic integrity verification for organizational decisions, targeting engineering teams and compliance-sensitive organizations. Unlike document tools (Notion, Confluence), it proves records haven't been altered. Unlike blockchain solutions, it runs on standard cloud infrastructure with sub-second latency.
 
 ---
 
 ## License
 
-Source code in this repository: see `LICENSE`.
+MIT
 
 ---
 
-## About
-
-POW Ledger is the operations and verification layer of [TalonSight Technologies](https://talonsight.tech) — a Creative Intelligence Operating System. The multi-agent verification pattern submitted here generalizes across the broader platform.
-
-Built by Jermaine Nelson, Atlanta GA.
+*Built by Jermaine Nelson ([TalonSight Technologies](https://talonsight.tech)) for the Google for Startups AI Agents Challenge 2026.*

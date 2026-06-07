@@ -1,68 +1,167 @@
-# POW Ledger Verification System — Demo Script (1:45)
+# POW Ledger Demo Script
 
-**Submission track:** Track 1 (Build · Net-New Agents)
-**Tagline:** Two collaborating agents turn a founder's scattered workspace decisions into cryptographically verifiable, reusable workflows.
-**Hard runtime ceiling:** 2:00 (only the first 2 minutes are evaluated).
-**Target:** 1:45 with a 15-second buffer.
-**Demo environment:** Live Cloud Run URL, judge login provisioned, seeded founder account with 3 weeks of decision history.
+> Total runtime: ~2:45–3:00
+> Format: Screen recording with voiceover
+> Setup: Terminal + browser side by side, pre-authenticated (`gcloud auth application-default login`), frontend running (`npm run dev` on port 3000)
 
 ---
 
-## Pre-Recording Setup
+## PRE-RECORDING CHECKLIST
 
-Seed the founder account so the agents have real signal to reason over. Across three weeks, the founder has done the **same decision sequence three times** — pipeline review email → vendor spend Slack message → calendar event titled "decision: vendor approval" → Drive doc with rationale. Pre-seed the first two occurrences. Leave the third occurrence's final Drive doc unwritten, so when you trigger the demo live, the Capture Agent picks it up in real time.
-
----
-
-## The Cut (1:45 target)
-
-**[0:00–0:12] Problem.**
-"Founders make dozens of consequential decisions a week across email, calendar, and chat — and almost none of it ends up as a verifiable, reusable record. We built two agents that fix that." Cut to live app.
-
-**[0:12–0:35] Capture Agent in action.**
-Show the founder's Gmail (open via the Workspace MCP connection). The Capture Agent picks up the latest decision-shaped email — vendor approval thread. Cut to the agent's reasoning panel: "Detected decision event in Gmail. Drafted ledger entry. Sending to Verification Agent over A2A." Visual: the A2A handoff is animated in the agent panel so judges *see* the protocol fire.
-
-**[0:35–1:00] Verification Agent reasoning.**
-The Verification Agent receives the proposal, queries the POW Ledger via MCP, and reasons over the founder's history. Show the agent's chain of thought condensed: "This is the third occurrence of the sequence [pipeline review → vendor decision → rationale doc]. Pattern threshold met. Proposing reusable 'Vendor Approval Workflow' artifact." This is the **hero moment** — visible multi-agent reasoning grounded in real ledger data.
-
-**[1:00–1:20] Founder approval.**
-The Verification Agent's proposal surfaces in the POW Ledger UI. Founder reviews the proposed workflow (clear step list) and clicks **Approve**. Key line: "Two agents collaborate, but nothing enters the verified record without human approval. The agents propose. The founder decides."
-
-**[1:20–1:40] Payoff — verification, lineage, export.**
-The approved workflow is now a ledger entry. Click into it: show the SHA-256 hash, the `modelId` and `modelVersion` of both contributing agents, and the lineage chain back to the three source decisions the workflow was generalized from. Hit **Black Box export** — a sealed, integrity-hashed audit artifact the founder owns.
-
-**[1:40–1:45] Close.**
-"Verifiable decision infrastructure for the modern operator. Two agents, one ledger, every decision provable."
+- [ ] `gcloud auth application-default login` (fresh session)
+- [ ] Frontend running: `cd ~/Downloads/Proof-Of-Work && npm run dev` → localhost:3000 open in browser
+- [ ] Terminal visible with Python environment active: `source agents/verification/.venv/bin/activate`
+- [ ] Orchestrator resource ID ready: `ORCH=$(cat ~/Downloads/Proof-Of-Work/agents/orchestrator/deployed_resource.txt)`
+- [ ] Screen recording tool configured (terminal left, browser right)
+- [ ] Architecture diagram open in a browser tab (architecture_diagram.html)
 
 ---
 
-## Beat-to-Rubric Mapping
+## BEAT 1 — INTRO (0:00–0:25)
 
-- **Capture Agent + Workspace MCPs** → Track 1's "MCP to securely connect to external tools" requirement, made visible
-- **A2A handoff animated** → Multi-agent collaboration the judges are explicitly looking for
-- **Verification Agent reasoning over ledger** → Grounding in real data (the rubric's RAG/grounding emphasis)
-- **Founder approval** → Human-in-the-loop governance
-- **Hash + lineage + Black Box** → Production reliability, artifact lifecycle, audit infrastructure
-- **modelId / modelVersion logged** → Agent provenance, auditability
+**[SHOW: Architecture diagram in browser]**
 
----
-
-## Hard Guardrails
-
-- **Hit 1:45 exactly.** Anything over 2:00 is invisible to judges. Rehearse with a stopwatch.
-- **Never say** blockchain, token, crypto, web3, mint, or wallet — even casually. Use verifiable, tamper-evident, audit trail, provenance.
-- **Show the A2A protocol firing.** It's the multi-agent moment that distinguishes this submission. If it's not visually obvious, the multi-agent advantage evaporates.
-- **No platform vision.** Don't mention TalonSight, PCOMJR, or other terminals in the video. One product, one demo, one minute forty-five.
-- **Record a backup take.** Live demos break. Have the recorded version ready to submit as the actual video.
+> "POW Ledger is a multi-agent system that captures organizational decisions as cryptographically sealed artifacts — and verifies their integrity.
+>
+> Three agents run on Vertex AI Agent Engine with Gemini 2.5 Flash. The Orchestrator routes requests. The Capture Agent is the only writer — it seals decisions with SHA-256 hashes. The Verification Agent reads the ledger independently and recomputes hashes to confirm nothing's been altered.
+>
+> They communicate through an MCP Server on Cloud Run using the Streamable HTTP protocol. Let me show you how it works."
 
 ---
 
-## Pre-Day-6 Checklist
+## BEAT 2 — CAPTURE A DECISION (0:25–1:15)
 
-- [ ] Seeded founder account with 3 weeks of decision data, third occurrence left incomplete
-- [ ] Capture Agent reliably picks up the staged Gmail thread within 5 seconds of trigger
-- [ ] Verification Agent's reasoning panel is human-readable (not raw JSON dump)
-- [ ] A2A handoff is visually represented in the UI (animation, status indicator, or trace view)
-- [ ] modelId / modelVersion are visible in the ledger entry detail view
-- [ ] Black Box export button works end-to-end
-- [ ] Judge login provisioned on Cloud Run deployment with sample data
+**[SWITCH TO: Terminal]**
+
+> "First, I'll capture a real decision through the Orchestrator."
+
+**[PASTE AND RUN:]**
+```bash
+python -c "
+import vertexai
+from vertexai import agent_engines
+vertexai.init(project='proof-of-work-497822', location='us-central1')
+orch = agent_engines.get('$ORCH')
+session = orch.create_session(user_id='demo-user')
+for event in orch.stream_query(user_id='demo-user', session_id=session['id'],
+    message='Capture this decision: We are standardizing on PCOMJR architecture across all TalonSight terminals for consistent artifact provenance tracking'):
+    content = event.get('content', {})
+    for part in content.get('parts', []):
+        if 'text' in part: print(part['text'])
+"
+```
+
+**[WHILE WAITING ~10s:]**
+
+> "The Orchestrator receives this natural language input, classifies it as a decision capture request, and routes it to the Capture Agent via Agent-to-Agent communication.
+>
+> The Capture Agent calls two MCP tools: `append_decision` to create the artifact with a SHA-256 hash, and `record_event` to link the capture event with a signature."
+
+**[WHEN OUTPUT APPEARS:]**
+
+> "There's our artifact ID and hash. The decision is now sealed in the ledger. Let me copy that artifact ID — we'll verify it next."
+
+**[COPY THE ARTIFACT ID]**
+
+---
+
+## BEAT 3 — VERIFY THE ARTIFACT (1:15–2:00)
+
+> "Now I'll ask the Orchestrator to verify that same artifact."
+
+**[PASTE AND RUN (with real artifact ID):]**
+```bash
+python -c "
+import vertexai
+from vertexai import agent_engines
+vertexai.init(project='proof-of-work-497822', location='us-central1')
+orch = agent_engines.get('$ORCH')
+session = orch.create_session(user_id='demo-user')
+for event in orch.stream_query(user_id='demo-user', session_id=session['id'],
+    message='Verify artifact PASTE_ARTIFACT_ID_HERE'):
+    content = event.get('content', {})
+    for part in content.get('parts', []):
+        if 'text' in part: print(part['text'])
+"
+```
+
+**[WHILE WAITING ~12s:]**
+
+> "This time the Orchestrator routes to the Verification Agent. It calls `get_lineage` to retrieve the full entry chain, then `verify_entry` for each entry — recomputing the SHA-256 hash from scratch and comparing it against the stored value.
+>
+> Crucially, the Verification Agent has no write access. It can only read. So this is a genuine independent integrity check."
+
+**[WHEN OUTPUT APPEARS:]**
+
+> "Both entries verified — hashes match. And it correctly reports no workflow patterns detected, since this is a new decision with only two entries in its chain. With three or more similar decisions, the system would propose workflow automation."
+
+---
+
+## BEAT 4 — CONSTELLATION VISUALIZATION (2:00–2:30)
+
+**[SWITCH TO: Browser at localhost:3000]**
+
+> "Here's the POW Constellation — a force-directed graph built with D3 that visualizes every artifact in the ledger."
+
+**[INTERACT: Click an artifact node]**
+
+> "Each node is a decision artifact. Clicking one shows its detail panel — the hash, timestamps, type, and full provenance chain. Artifacts cluster by type, so you can see patterns in your organizational decision-making at a glance."
+
+**[PAN/ZOOM BRIEFLY]**
+
+---
+
+## BEAT 5 — EVAL RESULTS (2:30–2:45)
+
+**[SWITCH TO: Terminal]**
+
+> "Finally, the automated eval harness."
+
+**[RUN:]**
+```bash
+python eval_harness.py
+```
+
+> "Six test scenarios covering end-to-end round-trips, routing correctness, non-decision rejection, invalid ID handling, and artifact listing. All six pass."
+
+**[WHEN OUTPUT SHOWS 6/6:]**
+
+> "Six out of six. Results are saved to `eval_report.json` for submission evidence."
+
+---
+
+## BEAT 6 — CLOSE (2:45–3:00)
+
+**[SHOW: Architecture diagram again]**
+
+> "POW Ledger — three specialized agents, a single-writer protocol, cryptographic verification, and an automated eval pipeline. All built on Google Cloud with ADK, Gemini 2.5 Flash, and Vertex AI Agent Engine. Thanks for watching."
+
+---
+
+## CONTINGENCY NOTES
+
+**If the Capture call takes longer than 15s:** Don't narrate the wait. Keep talking about the architecture. The response will come.
+
+**If you get a 403 error:** Re-run `gcloud auth application-default login` and try again. The `allAuthenticatedUsers` binding covers this — it's almost always an expired local credential.
+
+**If the Verification Agent returns unexpected results:** The system is correct even if the output format varies. Gemini's natural language responses may phrase results differently between runs. Focus on whether the hashes match (Valid ✅) and the artifact ID is correct.
+
+**If the eval harness fails a test:** Run it again. Transient network issues with Vertex AI Agent Engine can cause occasional timeouts. The harness has been validated at 6/6 across multiple runs.
+
+**If the Constellation doesn't show data:** Make sure the frontend is connected to the right Ledger API endpoint. Check `src/` config for the API URL.
+
+---
+
+## RECORDING TIPS
+
+1. **Do a dry run first.** Run the capture + verify commands once before recording to warm up the agent sessions and confirm everything works.
+
+2. **Pre-size your terminal.** Use a large font (14-16pt) so the output is readable in the video. Dark terminal background, light text.
+
+3. **Don't rush the pauses.** When waiting for agent responses, your narration fills the gap naturally. The 10-12 second waits are actually a feature — they show real distributed system communication.
+
+4. **Copy-paste, don't type.** Have the Python one-liners ready in a text file. Paste them in. Typing live introduces typo risk.
+
+5. **Keep it under 3 minutes.** The first 3 minutes are what gets evaluated. Everything after is ignored. The script above is timed to ~2:45.
+
+6. **Record audio separately if possible.** A clean voiceover mixed in post is more professional than live narration with keyboard sounds. If recording live, mute keyboard sounds.

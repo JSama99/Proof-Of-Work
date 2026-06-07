@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POW Ledger — System Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0C0E14;
+    --surface: #141822;
+    --surface-2: #1A1F2E;
+    --border: rgba(255,255,255,0.08);
+    --text: #E8E6DF;
+    --text-muted: #8A8880;
+    --text-dim: #5A5850;
+    --purple: #9B8AFB;
+    --purple-bg: rgba(155,138,251,0.08);
+    --purple-border: rgba(155,138,251,0.25);
+    --teal: #5DCAA5;
+    --teal-bg: rgba(93,202,165,0.08);
+    --teal-border: rgba(93,202,165,0.25);
+    --coral: #F0997B;
+    --coral-bg: rgba(240,153,123,0.08);
+    --coral-border: rgba(240,153,123,0.25);
+    --blue: #85B7EB;
+    --blue-bg: rgba(133,183,235,0.08);
+    --blue-border: rgba(133,183,235,0.25);
+    --amber: #EF9F27;
+    --gray: #888780;
+    --gray-bg: rgba(136,135,128,0.06);
+    --gray-border: rgba(136,135,128,0.2);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+  }
+  .container {
+    max-width: 960px;
+    width: 100%;
+  }
+  .header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+  .header h1 span { color: var(--purple); }
+  .header p {
+    font-size: 14px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .diagram {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .row {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    position: relative;
+  }
+  .node {
+    position: relative;
+    border-radius: 12px;
+    padding: 16px 24px;
+    text-align: center;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .node:hover {
+    transform: translateY(-2px);
+  }
+  .node-title {
+    font-size: 15px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .node-subtitle {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    opacity: 0.7;
+  }
+  .node-tech {
+    font-size: 11px;
+    margin-top: 6px;
+    opacity: 0.5;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  /* Color variants */
+  .node--gray { background: var(--gray-bg); border: 1px solid var(--gray-border); }
+  .node--gray .node-title { color: var(--gray); }
+  .node--purple { background: var(--purple-bg); border: 1px solid var(--purple-border); }
+  .node--purple .node-title { color: var(--purple); }
+  .node--teal { background: var(--teal-bg); border: 1px solid var(--teal-border); }
+  .node--teal .node-title { color: var(--teal); }
+  .node--coral { background: var(--coral-bg); border: 1px solid var(--coral-border); }
+  .node--coral .node-title { color: var(--coral); }
+  .node--blue { background: var(--blue-bg); border: 1px solid var(--blue-border); }
+  .node--blue .node-title { color: var(--blue); }
+
+  /* Connectors */
+  .connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0;
+    position: relative;
+  }
+  .connector-line {
+    width: 1px;
+    height: 32px;
+    background: var(--border);
+    position: relative;
+  }
+  .connector-line::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: -3px;
+    width: 7px;
+    height: 7px;
+    border-right: 1px solid var(--text-dim);
+    border-bottom: 1px solid var(--text-dim);
+    transform: rotate(45deg);
+  }
+  .connector-label {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 6px 12px;
+    background: var(--surface);
+    border-radius: 4px;
+    margin: 4px 0;
+  }
+
+  /* Split connector for A2A */
+  .split-connector {
+    position: relative;
+    width: 100%;
+    height: 80px;
+    margin: 8px 0;
+  }
+  .split-connector svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+  .agents-row {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    width: 100%;
+  }
+  .agent-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    max-width: 380px;
+  }
+  .tools-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 10px;
+  }
+  .tool-badge {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 10px;
+    border-radius: 20px;
+    letter-spacing: 0.3px;
+  }
+  .tool-badge--teal {
+    background: var(--teal-bg);
+    color: var(--teal);
+    border: 1px solid var(--teal-border);
+  }
+  .tool-badge--coral {
+    background: var(--coral-bg);
+    color: var(--coral);
+    border: 1px solid var(--coral-border);
+  }
+  .tool-badge--purple {
+    background: var(--purple-bg);
+    color: var(--purple);
+    border: 1px solid var(--purple-border);
+  }
+
+  /* Protocol badges */
+  .protocol-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 0;
+  }
+  .protocol-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  /* Merge connector */
+  .merge-connector {
+    position: relative;
+    width: 100%;
+    height: 60px;
+    margin: 8px 0;
+  }
+  .merge-connector svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Footer tech stack */
+  .footer-stack {
+    margin-top: 48px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+  }
+  .stack-chip {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+
+  /* Single-writer / Reader badges */
+  .role-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-bottom: 8px;
+  }
+  .role-badge--writer {
+    background: rgba(93,202,165,0.15);
+    color: var(--teal);
+  }
+  .role-badge--reader {
+    background: rgba(240,153,123,0.15);
+    color: var(--coral);
+  }
+
+  /* Branding */
+  .brand-mark {
+    position: fixed;
+    bottom: 20px;
+    right: 24px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1><span>POW Ledger</span> Verification System</h1>
+    <p>Multi-agent architecture · Google Cloud</p>
+  </div>
+
+  <div class="diagram">
+
+    <!-- User -->
+    <div class="row">
+      <div class="node node--gray" style="min-width: 200px;">
+        <div class="node-title">User prompt</div>
+        <div class="node-subtitle">Natural language decision input</div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- Orchestrator -->
+    <div class="row">
+      <div class="node node--purple" style="min-width: 440px;">
+        <div class="node-title">Orchestrator Agent</div>
+        <div class="node-subtitle">Routes to specialized agents — no direct ledger access</div>
+        <div class="tools-list" style="margin-top: 8px;">
+          <span class="tool-badge tool-badge--purple">capture_decision</span>
+          <span class="tool-badge tool-badge--purple">verify_artifact</span>
+        </div>
+        <div class="node-tech">Vertex AI Agent Engine · Gemini 2.5 Flash</div>
+      </div>
+    </div>
+
+    <!-- A2A Split -->
+    <div class="connector" style="padding: 8px 0;">
+      <div class="connector-label">A2A · stream_query</div>
+    </div>
+
+    <!-- Two Agents Side by Side -->
+    <div class="agents-row">
+      <!-- Capture Agent -->
+      <div class="agent-col">
+        <span class="role-badge role-badge--writer">single-writer</span>
+        <div class="node node--teal" style="width: 100%;">
+          <div class="node-title">Capture Agent</div>
+          <div class="node-subtitle">Mutates the ledger — only writer</div>
+          <div class="tools-list">
+            <span class="tool-badge tool-badge--teal">append_decision</span>
+            <span class="tool-badge tool-badge--teal">record_event</span>
+            <span class="tool-badge tool-badge--teal">list_artifacts</span>
+          </div>
+          <div class="node-tech">Vertex AI Agent Engine</div>
+        </div>
+      </div>
+
+      <!-- Verification Agent -->
+      <div class="agent-col">
+        <span class="role-badge role-badge--reader">reader</span>
+        <div class="node node--coral" style="width: 100%;">
+          <div class="node-title">Verification Agent</div>
+          <div class="node-subtitle">Reads and verifies ledger integrity</div>
+          <div class="tools-list">
+            <span class="tool-badge tool-badge--coral">get_lineage</span>
+            <span class="tool-badge tool-badge--coral">verify_entry</span>
+            <span class="tool-badge tool-badge--coral">propose_workflow</span>
+          </div>
+          <div class="node-tech">Vertex AI Agent Engine</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MCP Protocol -->
+    <div class="connector">
+      <div class="protocol-badge"><span class="protocol-dot"></span> Streamable HTTP · MCP Protocol</div>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- MCP Server -->
+    <div class="row">
+      <div class="node node--blue" style="min-width: 400px;">
+        <div class="node-title">MCP Server</div>
+        <div class="node-subtitle">5 tools · Streamable HTTP · Cloud Run</div>
+        <div class="node-tech">FastMCP · ID token auth per request</div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <div class="connector-label">REST API</div>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- Ledger API -->
+    <div class="row">
+      <div class="node node--blue" style="min-width: 320px;">
+        <div class="node-title">Ledger API</div>
+        <div class="node-subtitle">Decision storage · SHA-256 hashing · Cloud Run</div>
+      </div>
+    </div>
+
+    <div class="connector">
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- Cloud SQL -->
+    <div class="row">
+      <div class="node node--gray" style="min-width: 240px;">
+        <div class="node-title">Cloud SQL</div>
+        <div class="node-subtitle">PostgreSQL · Persistent ledger store</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tech Stack Footer -->
+  <div class="footer-stack">
+    <span class="stack-chip">Google ADK</span>
+    <span class="stack-chip">Vertex AI Agent Engine</span>
+    <span class="stack-chip">Gemini 2.5 Flash</span>
+    <span class="stack-chip">Cloud Run</span>
+    <span class="stack-chip">Cloud SQL</span>
+    <span class="stack-chip">FastMCP</span>
+    <span class="stack-chip">Python 3.11</span>
+    <span class="stack-chip">React + D3.js</span>
+  </div>
+
+</div>
+
+<div class="brand-mark">TalonSight Technologies</div>
+
+</body>
+</html>
