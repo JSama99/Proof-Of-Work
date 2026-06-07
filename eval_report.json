@@ -1,0 +1,56 @@
+{
+  "system": "POW Ledger Verification System",
+  "challenge": "Google for Startups AI Agents Challenge \u2014 Track 1",
+  "timestamp": "2026-06-07T04:52:01.491068+00:00",
+  "project": "proof-of-work-497822",
+  "agents": {
+    "orchestrator": "projects/878967828995/locations/us-central1/reasoningEngines/1392182381636485120",
+    "capture": "projects/878967828995/locations/us-central1/reasoningEngines/3575852056818221056",
+    "verification": "projects/878967828995/locations/us-central1/reasoningEngines/5023772531157368832"
+  },
+  "results": [
+    {
+      "test": "1. Round-trip Capture \u2192 Verify",
+      "status": "PASS",
+      "elapsed_s": 20.0,
+      "details": "Captured xqjeBBGxIIaMK6v1qnBTT, verified with valid entries"
+    },
+    {
+      "test": "2. Orchestrator routes capture intent",
+      "status": "PASS",
+      "elapsed_s": 7.2,
+      "details": "Routed to capture_decision (tools called: ['capture_decision'])"
+    },
+    {
+      "test": "3. Orchestrator routes verify intent",
+      "status": "PASS",
+      "elapsed_s": 12.3,
+      "details": "Routed to verify_artifact (tools called: ['verify_artifact'])"
+    },
+    {
+      "test": "4. Non-decision input rejection",
+      "status": "PASS",
+      "elapsed_s": 2.2,
+      "details": "Correctly rejected non-decision. Response: that doesn't sound like a decision. could you please state your decision clearly so i can capture it?"
+    },
+    {
+      "test": "5. Invalid artifact ID handling",
+      "status": "PASS",
+      "elapsed_s": 6.7,
+      "details": "Handled gracefully. Response: no lineage entries found for artifact `nonexistent_fake_id_12345`. i cannot perform verification or propose workflows."
+    },
+    {
+      "test": "6. List artifacts from ledger",
+      "status": "PASS",
+      "elapsed_s": 5.7,
+      "details": "Listed artifacts. Tools: ['list_artifacts']. Preview: Here are the artifacts currently in the ledger:\n\n*   **ID:** 3OkeOI6EIoFHyJmJmgc7L\n    **Title:** Choose FastAPI over Flask for new microservice\n    **Type:** journal\n*   **ID:** xqjeBBGxIIaMK6v1qnBTT"
+    }
+  ],
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "errors": 0,
+    "total_time_s": 54.1
+  }
+}

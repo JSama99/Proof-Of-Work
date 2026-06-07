@@ -37,6 +37,7 @@ remote = agent_engines.create(
         "google-adk>=1.0.0",
         "mcp>=1.0.0",
         "python-dotenv",
+        "requests",
     ],
     extra_packages=["./agent.py"],
     env_vars={
