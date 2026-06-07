@@ -29,3 +29,9 @@ vite.config.ts.*
 .adk/
 traces/
 deployed_resource.txt
+
+# ADK session databases
+.adk/
+
+# Zip exports
+*.zip
