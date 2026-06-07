@@ -7,21 +7,23 @@ import { SnapshotView } from "@/components/snapshot-view";
 import { ActivityLog } from "@/components/activity-log";
 import { ManualDialog } from "@/components/manual-dialog";
 import { LedgerDashboard } from "@/components/ledger-dashboard";
+import { ConstellationView } from "@/components/constellation-view";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { getArtifact, getUserId, clearToken, clearUserId, type ArtifactGetResponse } from "@/lib/api";
 import type { ArtifactRecord, ArtifactSnapshotRecord, RTVResponse } from "@shared/schema";
-import { 
-  Zap, 
-  LogOut, 
-  FileEdit, 
-  CheckCircle2, 
+import {
+  Zap,
+  LogOut,
+  FileEdit,
+  CheckCircle2,
   Sparkles,
   Menu,
   Activity,
   ScrollText,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -38,6 +40,7 @@ export default function Home({ onLogout }: HomeProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
+  const [showConstellation, setShowConstellation] = useState(false);
   
   const [currentArtifact, setCurrentArtifact] = useState<ArtifactRecord | null>(null);
   const [currentSnapshot, setCurrentSnapshot] = useState<ArtifactSnapshotRecord | null>(null);
@@ -175,17 +178,25 @@ export default function Home({ onLogout }: HomeProps) {
             </span>
             <ManualDialog />
             <Button
+              variant={showConstellation ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => { setShowConstellation(!showConstellation); setShowLedger(false); }}
+              title="Constellation View"
+            >
+              <Network className="h-4 w-4" />
+            </Button>
+            <Button
               variant={showLedger ? "secondary" : "ghost"}
               size="icon"
-              onClick={() => setShowLedger(!showLedger)}
+              onClick={() => { setShowLedger(!showLedger); setShowConstellation(false); }}
               data-testid="button-ledger"
               title="POW Ledger"
             >
               <ScrollText className="h-4 w-4" />
             </Button>
-            <Button 
-              variant={showActivityLog ? "secondary" : "ghost"} 
-              size="icon" 
+            <Button
+              variant={showActivityLog ? "secondary" : "ghost"}
+              size="icon"
               onClick={() => setShowActivityLog(!showActivityLog)}
               data-testid="button-activity-log"
             >
@@ -199,7 +210,11 @@ export default function Home({ onLogout }: HomeProps) {
         </header>
 
         <div className="flex-1 overflow-hidden flex">
-          {showLedger ? (
+          {showConstellation ? (
+            <div className="flex-1 overflow-hidden">
+              <ConstellationView onBack={() => setShowConstellation(false)} />
+            </div>
+          ) : showLedger ? (
             <div className="flex-1 overflow-hidden">
               <LedgerDashboard onBack={() => setShowLedger(false)} />
             </div>
