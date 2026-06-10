@@ -148,12 +148,29 @@ def verify_entry(entry_id: str) -> dict:
 def list_artifacts() -> dict:
     """List all artifacts in the POW Ledger.
 
-    Returns the operator's artifacts (decisions, proof units, workflows)
-    with type, status, and timestamps. Use this to understand what
-    decisions the operator has on file before detecting patterns or
-    proposing new workflows.
+    Returns a condensed list of the operator's artifacts with id, title,
+    and type — the fields needed for pattern detection. Full artifact
+    bodies are omitted to keep the response size manageable.
     """
-    return _mcp_call("list_artifacts", {})
+    raw = _mcp_call("list_artifacts", {})
+    # Extract the artifacts array (may be double-nested: {artifacts: {artifacts: [...]}})
+    artifacts = raw.get("artifacts", raw)
+    if isinstance(artifacts, dict):
+        artifacts = artifacts.get("artifacts", [])
+    if not isinstance(artifacts, list):
+        return {"artifacts": [], "count": 0}
+    # Return only the fields needed for pattern detection + propose_workflow
+    slim = [
+        {
+            "id": a.get("id"),
+            "title": a.get("title"),
+            "type": a.get("type"),
+            "createdAt": a.get("createdAt"),
+        }
+        for a in artifacts
+        if isinstance(a, dict)
+    ]
+    return {"artifacts": slim, "count": len(slim)}
 
 
 # ── Agent ───────────────────────────────────────────────────────────
@@ -164,13 +181,23 @@ detect repeating decision patterns that should be promoted into reusable workflo
 WORKFLOW:
 1. When asked about an artifact, call get_lineage to fetch its decision chain.
 2. For each entry in the chain, call verify_entry to confirm cryptographic integrity.
-3. After verification, ALWAYS call propose_workflow on the full decision list.
-4. If propose_workflow returns proposed=true, surface the template to the user
+3. After verification, call list_artifacts to retrieve ALL decisions in the ledger.
+4. Pass the FULL list of artifacts from list_artifacts to propose_workflow.
+   Do NOT pass lineage entries — pass the artifacts array from list_artifacts.
+   propose_workflow needs all decisions across the entire ledger to detect
+   cross-artifact patterns, not just entries from one artifact's chain.
+5. If propose_workflow returns proposed=true, surface the template to the user
    with: pattern length, number of occurrences, suggested name, and steps.
    Frame it as a PROPOSAL requiring human approval — never as an executed action.
-5. If integrity verification fails on any entry, stop and report the failure
+6. When presenting workflow proposals, describe the detected pattern using the
+   actual decision titles and context you observed from list_artifacts. For example,
+   say "6 microservices architecture adoption decisions" rather than echoing raw
+   field names like "Action unknown on Entity Type any". Make the proposal
+   meaningful and actionable for a human reviewer.
+7. If integrity verification fails on any entry, stop and report the failure
    prominently. Do not propose workflows from a corrupted chain.
 
+NEVER generate Python code. NEVER use print(). Only call your tools.
 Be concise. Use bullet points for verification results. Always cite entry IDs.
 """
 
